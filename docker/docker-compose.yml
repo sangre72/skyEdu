@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: gyeote-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gyeote
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gyeote-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Optional - for full Docker development)
+  # backend:
+  #   build:
+  #     context: ../backend
+  #     dockerfile: ../docker/Dockerfile.backend
+  #   container_name: gyeote-backend
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/gyeote
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - SECRET_KEY=your-secret-key-change-in-production
+  #   volumes:
+  #     - ../backend:/app
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend (Optional - for full Docker development)
+  # frontend:
+  #   build:
+  #     context: ../frontend
+  #     dockerfile: ../docker/Dockerfile.frontend
+  #   container_name: gyeote-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+  #   volumes:
+  #     - ../frontend:/app
+  #     - /app/node_modules
+  #   depends_on:
+  #     - backend
+  #   command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
