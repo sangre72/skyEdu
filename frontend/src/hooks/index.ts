@@ -24,3 +24,16 @@ export { useCompanions, useCompanion } from './useCompanions';
 
 // 지역 데이터
 export { useRegions, getRegionDataStatic, clearRegionCache } from './useRegions';
+
+// 게시판
+export {
+  useBoards,
+  useBoard,
+  usePosts,
+  usePost,
+  useCreatePost,
+  useUpdatePost,
+  useDeletePost,
+  useComments,
+  useCreateComment,
+} from './useBoard';

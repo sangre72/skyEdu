@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.core.board_exceptions import BoardException, board_exception_handler
 from app.core.config import settings
 
 
@@ -36,6 +37,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 예외 핸들러 등록
+app.add_exception_handler(BoardException, board_exception_handler)
 
 # API 라우터 등록
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

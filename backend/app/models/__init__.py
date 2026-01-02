@@ -5,6 +5,7 @@ from app.models.reservation import Reservation, ServiceType, ReservationStatus
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
 from app.models.review import Review
 from app.models.promotion import Promotion, DiscountType, DiscountTarget
+from app.models.board import Board, BoardCategory, Post, Comment, Attachment
 
 __all__ = [
     # User
@@ -30,4 +31,10 @@ __all__ = [
     "Promotion",
     "DiscountType",
     "DiscountTarget",
+    # Board
+    "Board",
+    "BoardCategory",
+    "Post",
+    "Comment",
+    "Attachment",
 ]

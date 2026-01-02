@@ -37,6 +37,24 @@ from app.schemas.review import (
     ReviewUpdate,
 )
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.schemas.board import (
+    BoardCreate,
+    BoardUpdate,
+    BoardResponse,
+    BoardCategoryCreate,
+    BoardCategoryUpdate,
+    BoardCategoryResponse,
+    PostCreate,
+    PostUpdate,
+    PostResponse,
+    PostListItem,
+    CommentCreate,
+    CommentUpdate,
+    CommentResponse,
+    AttachmentResponse,
+    PaginatedResponse,
+    ErrorResponse,
+)
 
 __all__ = [
     # Auth
@@ -78,4 +96,21 @@ __all__ = [
     "PaymentConfirm",
     "RefundRequest",
     "PaymentListResponse",
+    # Board
+    "BoardCreate",
+    "BoardUpdate",
+    "BoardResponse",
+    "BoardCategoryCreate",
+    "BoardCategoryUpdate",
+    "BoardCategoryResponse",
+    "PostCreate",
+    "PostUpdate",
+    "PostResponse",
+    "PostListItem",
+    "CommentCreate",
+    "CommentUpdate",
+    "CommentResponse",
+    "AttachmentResponse",
+    "PaginatedResponse",
+    "ErrorResponse",
 ]
