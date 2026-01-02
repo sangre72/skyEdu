@@ -230,7 +230,7 @@ export default function CompanionRegisterPage() {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <Header />
 
-      <Container maxWidth="sm" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         <Breadcrumb
           items={[
             { label: '마이페이지', href: '/mypage' },

@@ -7,6 +7,7 @@
 
 // 인증
 export { useAuth } from './useAuth';
+export { useAuthRedirect } from './useAuthRedirect';
 
 // API 유틸리티
 export { useApi, useMutation } from './useApi';

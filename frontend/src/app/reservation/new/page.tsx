@@ -650,7 +650,7 @@ function ReservationNewContent() {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <Header />
 
-      <Container maxWidth="md" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         <Breadcrumb
           items={[{ label: '예약 신청' }]}
           showBackButton={true}

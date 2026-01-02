@@ -10,7 +10,7 @@ export default function TermsPage() {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <Header />
 
-      <Container maxWidth="md" sx={{ py: 6 }}>
+      <Container maxWidth="lg" sx={{ py: 6 }}>
         <Breadcrumb
           items={[{ label: '이용약관' }]}
           showBackButton={true}

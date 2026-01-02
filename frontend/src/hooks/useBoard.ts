@@ -12,11 +12,8 @@ import type {
   BoardCategoryUpdateRequest,
   BoardCreateRequest,
   BoardUpdateRequest,
-  Comment,
   CommentCreateRequest,
-  CommentUpdateRequest,
   PostCreateRequest,
-  PostDetailResponse,
   PostListParams,
   PostUpdateRequest,
 } from '@/types/board';
@@ -189,247 +186,210 @@ export function useDeleteCategory() {
  * 게시글 목록 조회
  */
 export function usePosts(boardCode: string, params?: PostListParams) {
-  const [data, setData] = useState<PostListResponse>({
-    items: [],
-    total: 0,
-    page: 1,
-    limit: 20,
+  return useQuery({
+    queryKey: boardKeys.postList(boardCode, params),
+    queryFn: () => boardApi.getPosts(boardCode, params),
+    enabled: !!boardCode,
+    select: (data) => ({
+      ...data,
+      totalPages: Math.ceil(data.total / (params?.limit || 20)),
+    }),
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        setIsLoading(true);
-        // TODO: API 호출
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        const filtered = MOCK_POSTS.filter((p) => {
-          const board = MOCK_BOARDS.find((b) => b.code === boardCode);
-          return p.boardId === board?.id;
-        });
-        setData({
-          items: filtered,
-          total: filtered.length,
-          page: params?.page || 1,
-          limit: params?.limit || 20,
-        });
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch posts'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (boardCode) {
-      fetchPosts();
-    }
-  }, [boardCode, params]);
-
-  return { ...data, isLoading, error };
 }
 
 /**
  * 게시글 상세 조회
  */
-export function usePost(boardCode: string, postId: string) {
-  const [post, setPost] = useState<Post | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        setIsLoading(true);
-        // TODO: API 호출
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        const foundPost = MOCK_POSTS.find((p) => p.id === postId);
-        if (!foundPost) {
-          throw new Error('게시글을 찾을 수 없습니다.');
-        }
-        setPost(foundPost);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch post'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (boardCode && postId) {
-      fetchPost();
-    }
-  }, [boardCode, postId]);
-
-  return { post, isLoading, error };
+export function usePost(boardCode: string, postId: string, password?: string) {
+  return useQuery({
+    queryKey: boardKeys.postDetail(boardCode, postId),
+    queryFn: () => boardApi.getPost(boardCode, postId, password),
+    enabled: !!boardCode && !!postId,
+  });
 }
 
 /**
  * 게시글 작성
  */
-export function useCreatePost() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+export function useCreatePost(boardCode: string) {
+  const queryClient = useQueryClient();
 
-  const createPost = useCallback(async (boardCode: string, data: PostCreateRequest) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      // TODO: API 호출
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const newPost: Post = {
-        id: String(Date.now()),
-        boardId: MOCK_BOARDS.find((b) => b.code === boardCode)?.id || '1',
-        authorId: 'user1',
-        authorName: '사용자',
-        ...data,
-        isNotice: data.isNotice || false,
-        isSecret: data.isSecret || false,
-        viewCount: 0,
-        likeCount: 0,
-        commentCount: 0,
-        isAnswered: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        attachments: [],
-      };
-      return newPost;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to create post');
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  return { createPost, isLoading, error };
+  return useMutation({
+    mutationFn: (data: PostCreateRequest) => boardApi.createPost(boardCode, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: boardKeys.posts(boardCode) });
+    },
+  });
 }
 
 /**
  * 게시글 수정
  */
-export function useUpdatePost() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+export function useUpdatePost(boardCode: string, postId: string) {
+  const queryClient = useQueryClient();
 
-  const updatePost = useCallback(
-    async (boardCode: string, postId: string, data: PostUpdateRequest) => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        // TODO: API 호출
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        return true;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Failed to update post');
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
+  return useMutation({
+    mutationFn: (data: PostUpdateRequest) => boardApi.updatePost(boardCode, postId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: boardKeys.posts(boardCode) });
+      queryClient.invalidateQueries({ queryKey: boardKeys.postDetail(boardCode, postId) });
     },
-    []
-  );
-
-  return { updatePost, isLoading, error };
+  });
 }
 
 /**
  * 게시글 삭제
  */
-export function useDeletePost() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+export function useDeletePost(boardCode: string) {
+  const queryClient = useQueryClient();
 
-  const deletePost = useCallback(async (boardCode: string, postId: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      // TODO: API 호출
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      return true;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to delete post');
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  return { deletePost, isLoading, error };
+  return useMutation({
+    mutationFn: (postId: string) => boardApi.deletePost(boardCode, postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: boardKeys.posts(boardCode) });
+    },
+  });
 }
+
+/**
+ * 게시글 좋아요
+ */
+export function useLikePost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (postId: string) => boardApi.likePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: boardKeys.all });
+    },
+  });
+}
+
+/**
+ * 게시글 좋아요 취소
+ */
+export function useUnlikePost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (postId: string) => boardApi.unlikePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: boardKeys.all });
+    },
+  });
+}
+
+// ============================================
+// 댓글 훅
+// ============================================
 
 /**
  * 댓글 목록 조회
  */
 export function useComments(postId: string) {
-  const [data, setData] = useState<CommentListResponse>({
-    items: [],
-    total: 0,
+  return useQuery({
+    queryKey: boardKeys.comments(postId),
+    queryFn: () => boardApi.getComments(postId),
+    enabled: !!postId,
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    const fetchComments = async () => {
-      try {
-        setIsLoading(true);
-        // TODO: API 호출
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        setData({ items: [], total: 0 });
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch comments'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (postId) {
-      fetchComments();
-    }
-  }, [postId]);
-
-  return { ...data, isLoading, error };
 }
 
 /**
  * 댓글 작성
  */
-export function useCreateComment() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+export function useCreateComment(postId: string) {
+  const queryClient = useQueryClient();
 
-  const createComment = useCallback(async (postId: string, data: CommentCreateRequest) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      // TODO: API 호출
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const newComment: Comment = {
-        id: String(Date.now()),
-        postId,
-        parentId: data.parentId,
-        authorId: 'user1',
-        authorName: '사용자',
-        content: data.content,
-        isSecret: data.isSecret || false,
-        likeCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      return newComment;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to create comment');
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  return useMutation({
+    mutationFn: (data: CommentCreateRequest) => boardApi.createComment(postId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: boardKeys.comments(postId) });
+    },
+  });
+}
 
-  return { createComment, isLoading, error };
+/**
+ * 댓글 수정
+ */
+export function useUpdateComment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ commentId, content }: { commentId: string; content: string }) =>
+      boardApi.updateComment(commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+    },
+  });
+}
+
+/**
+ * 댓글 삭제
+ */
+export function useDeleteComment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (commentId: string) => boardApi.deleteComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+    },
+  });
+}
+
+/**
+ * 댓글 좋아요
+ */
+export function useLikeComment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (commentId: string) => boardApi.likeComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+    },
+  });
+}
+
+/**
+ * 댓글 좋아요 취소
+ */
+export function useUnlikeComment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (commentId: string) => boardApi.unlikeComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments'] });
+    },
+  });
+}
+
+// ============================================
+// 첨부파일 훅
+// ============================================
+
+/**
+ * 첨부파일 업로드
+ */
+export function useUploadAttachment() {
+  return useMutation({
+    mutationFn: (file: File) => boardApi.uploadAttachment(file),
+  });
+}
+
+/**
+ * 첨부파일 삭제
+ */
+export function useDeleteAttachment() {
+  return useMutation({
+    mutationFn: (attachmentId: string) => boardApi.deleteAttachment(attachmentId),
+  });
+}
+
+/**
+ * 첨부파일 다운로드 URL 가져오기
+ */
+export function getAttachmentDownloadUrl(attachmentId: string): string {
+  return boardApi.getAttachmentDownloadUrl(attachmentId);
 }

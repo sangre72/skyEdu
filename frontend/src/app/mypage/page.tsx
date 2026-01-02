@@ -82,7 +82,7 @@ export default function MyPage() {
     ? [
         { icon: <CalendarMonth />, label: '스케줄 관리', path: '/companion/schedule' },
         { icon: <Star />, label: '받은 리뷰', path: '/mypage/reviews' },
-        { icon: <Settings />, label: '동행인 프로필', path: '/companion/register' },
+        { icon: <Settings />, label: '프로필 관리', path: '/companion/register' },
       ]
     : [
         { icon: <CalendarMonth />, label: '예약 내역', path: '/mypage/reservations' },
@@ -94,7 +94,7 @@ export default function MyPage() {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <Header />
 
-      <Container maxWidth="md" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         <Breadcrumb
           items={[{ label: '마이페이지' }]}
           showBackButton={true}
@@ -279,14 +279,20 @@ export default function MyPage() {
         </DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            정말 탈퇴하시겠습니까? 탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.
+            정말 탈퇴하시겠습니까?
           </DialogContentText>
           <DialogContentText sx={{ mb: 2, fontSize: '0.875rem' }}>
-            • 예약 내역 및 이용 기록이 삭제됩니다
+            • 계정이 비활성화되며 서비스 이용이 불가합니다
             <br />
-            • 작성한 리뷰가 삭제됩니다
+            • 진행 중인 예약이 있다면 완료 후 탈퇴해주세요
             <br />
-            {isCompanion && '• 동행인 프로필 및 수익 정보가 삭제됩니다'}
+            {isCompanion && (
+              <>
+                • 미정산 수익이 있다면 정산 완료 후 탈퇴해주세요
+                <br />
+              </>
+            )}
+            • 재가입 시 기존 정보는 복구되지 않습니다
           </DialogContentText>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             탈퇴를 원하시면 아래에 <strong>탈퇴합니다</strong>를 입력해주세요.

@@ -33,6 +33,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: '동행인 찾기', path: '/companions' },
   { label: '예약하기', path: '/reservation/new' },
+  { label: '공지사항', path: '/boards/notice' },
+  { label: 'FAQ', path: '/boards/faq' },
   { label: '동행인 등록', path: '/companion/register', guestOnly: true },
   { label: '스케줄 관리', path: '/companion/schedule', roles: ['companion'], authRequired: true },
   { label: '대시보드', path: '/companion/dashboard', roles: ['companion'], authRequired: true },
