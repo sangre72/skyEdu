@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -8,10 +8,10 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Container,
   Divider,
   Grid,
-  LinearProgress,
   Paper,
   Typography,
 } from '@mui/material';
@@ -30,8 +30,10 @@ import UISizeControl from '@/components/common/UISizeControl';
 import RegionSelector, { RegionCompanionCount } from '@/components/common/RegionSelector';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useRegions } from '@/hooks/useRegions';
+import { api } from '@/lib/api';
 
 // 임시 동행인 현황 데이터 (실제로는 API에서 가져옴)
+// TODO: 백엔드 API 구현 시 실제 데이터로 대체
 const MOCK_PROVINCE_COMPANION_COUNTS: RegionCompanionCount = {
   seoul: 42,
   gyeonggi: 18,
@@ -103,19 +105,53 @@ const MOCK_DISTRICT_COMPANION_COUNTS: RegionCompanionCount = {
 export default function ServiceAreasPage() {
   const router = useRouter();
   const scale = useSettingsStore((state) => state.getScale());
-  const { provinces, getFullRegionName, getProvinceName, getDistrictsByProvince } = useRegions();
+  const { provinces, getFullRegionName, getProvinceName } = useRegions();
 
-  // 저장된 서비스 지역 (임시 데이터)
-  const [savedAreas, setSavedAreas] = useState<string[]>([
-    'seoul-gangnam',
-    'seoul-seocho',
-    'seoul-songpa',
-  ]);
+  // 저장된 서비스 지역
+  const [savedAreas, setSavedAreas] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 새로 추가할 지역 선택 상태
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // 매니저 프로필에서 지역 정보 조회
+  const fetchAreas = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const profile = await api.getMyManagerProfile();
+      setSavedAreas(profile.availableAreas || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '지역 정보를 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAreas();
+  }, [fetchAreas]);
+
+  // 지역 저장 API 호출
+  const saveAreas = useCallback(async (areas: string[]) => {
+    try {
+      setIsSaving(true);
+      setError(null);
+      await api.updateMyManagerProfile({ availableAreas: areas });
+      setSavedAreas(areas);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '지역 저장에 실패했습니다.');
+      throw err;
+    } finally {
+      setIsSaving(false);
+    }
+  }, []);
 
   // 총 동행인 수
   const totalCompanions = useMemo(() => {
@@ -132,15 +168,17 @@ export default function ServiceAreasPage() {
   }, []);
 
   // 지역 추가
-  const handleAddAreas = () => {
+  const handleAddAreas = async () => {
     if (selectedDistricts.length === 0) return;
 
     // 중복 제거하여 추가
     const newAreas = selectedDistricts.filter((d) => !savedAreas.includes(d));
     if (newAreas.length > 0) {
-      setSavedAreas((prev) => [...prev, ...newAreas]);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      try {
+        await saveAreas([...savedAreas, ...newAreas]);
+      } catch {
+        return;
+      }
     }
 
     // 선택 초기화
@@ -149,14 +187,23 @@ export default function ServiceAreasPage() {
   };
 
   // 지역 삭제
-  const handleRemoveArea = (areaCode: string) => {
-    setSavedAreas((prev) => prev.filter((a) => a !== areaCode));
+  const handleRemoveArea = async (areaCode: string) => {
+    const newAreas = savedAreas.filter((a) => a !== areaCode);
+    try {
+      await saveAreas(newAreas);
+    } catch {
+      // 에러 처리는 saveAreas에서 함
+    }
   };
 
   // 전체 삭제
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (window.confirm('모든 서비스 지역을 삭제하시겠습니까?')) {
-      setSavedAreas([]);
+      try {
+        await saveAreas([]);
+      } catch {
+        // 에러 처리는 saveAreas에서 함
+      }
     }
   };
 
@@ -169,6 +216,19 @@ export default function ServiceAreasPage() {
     acc[provinceCode].push(area);
     return acc;
   }, {} as Record<string, string[]>);
+
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Header />
+        <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+          <CircularProgress />
+        </Container>
+        <Footer />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
@@ -201,7 +261,14 @@ export default function ServiceAreasPage() {
         {/* 성공 알림 */}
         {showSuccess && (
           <Alert severity="success" sx={{ mb: 3 }}>
-            서비스 지역이 추가되었습니다!
+            서비스 지역이 저장되었습니다!
+          </Alert>
+        )}
+
+        {/* 에러 알림 */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
           </Alert>
         )}
 
@@ -318,10 +385,11 @@ export default function ServiceAreasPage() {
               <Button
                 variant="contained"
                 fullWidth
-                disabled={selectedDistricts.length === 0}
+                disabled={selectedDistricts.length === 0 || isSaving}
                 onClick={handleAddAreas}
                 sx={{ fontSize: `${1 * scale}rem` }}
               >
+                {isSaving ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
                 선택한 지역 추가하기
               </Button>
             </Paper>

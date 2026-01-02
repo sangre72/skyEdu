@@ -1,7 +1,7 @@
 """API v1 라우터."""
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, boards, health, managers, payments, reservations, reviews, users
+from app.api.v1.endpoints import auth, boards, health, managers, payments, promotions, reservations, reviews, users
 
 api_router = APIRouter()
 
@@ -10,6 +10,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["인증"])
 api_router.include_router(users.router, prefix="/users", tags=["사용자"])
 api_router.include_router(reservations.router, prefix="/reservations", tags=["예약"])
 api_router.include_router(managers.router, prefix="/managers", tags=["매니저"])
+api_router.include_router(promotions.router, prefix="/promotions", tags=["프로모션"])
 api_router.include_router(payments.router, prefix="/payments", tags=["결제"])
 api_router.include_router(reviews.router, prefix="/reviews", tags=["리뷰"])
 api_router.include_router(boards.router, tags=["게시판"])

@@ -3,15 +3,19 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 import { useAuthStore } from '@/stores/authStore';
 import type {
   AuthResponse,
+  CreatePromotionRequest,
   CreateReservationRequest,
   LoginRequest,
   Manager,
   ManagerCreateRequest,
+  ManagerDetail,
   ManagerListResponse,
   ManagerSchedule,
+  ManagerUpdateRequest,
   PhoneVerifyConfirmRequest,
   PhoneVerifyResponse,
   PhoneVerifySendRequest,
+  Promotion,
   RegisterRequest,
   Reservation,
   ReservationListResponse,
@@ -152,6 +156,23 @@ class ApiClient {
     return response.data;
   }
 
+  async getMyManagerProfile(): Promise<ManagerDetail> {
+    const response = await this.client.get<ManagerDetail>('/managers/me');
+    return response.data;
+  }
+
+  async updateMyManagerProfile(data: ManagerUpdateRequest): Promise<Manager> {
+    const response = await this.client.patch<Manager>('/managers/me', {
+      introduction: data.introduction,
+      certifications: data.certifications,
+      available_areas: data.availableAreas,
+      profile_image: data.profileImage,
+      bank_name: data.bankName,
+      bank_account: data.bankAccount,
+    });
+    return response.data;
+  }
+
   // ============ Schedules ============
   async getMySchedules(params?: {
     startDate?: string;
@@ -210,6 +231,51 @@ class ApiClient {
 
   async updateMe(data: UserUpdateRequest): Promise<UserWithProfile> {
     const response = await this.client.patch<UserWithProfile>('/users/me', data);
+    return response.data;
+  }
+
+  // ============ Promotions ============
+  async getMyPromotions(): Promise<{ items: Promotion[]; total: number }> {
+    const response = await this.client.get<{ items: Promotion[]; total: number }>('/promotions/me');
+    return response.data;
+  }
+
+  async createPromotion(data: CreatePromotionRequest): Promise<Promotion> {
+    const response = await this.client.post<Promotion>('/promotions/me', {
+      name: data.name,
+      description: data.description,
+      discount_type: data.discountType,
+      discount_value: data.discountValue,
+      target_type: data.targetType,
+      target_service_type: data.targetServiceType,
+      start_date: data.startDate,
+      end_date: data.endDate,
+      max_usage: data.maxUsage,
+    });
+    return response.data;
+  }
+
+  async updatePromotion(promotionId: string, data: Partial<CreatePromotionRequest>): Promise<Promotion> {
+    const response = await this.client.patch<Promotion>(`/promotions/me/${promotionId}`, {
+      name: data.name,
+      description: data.description,
+      discount_type: data.discountType,
+      discount_value: data.discountValue,
+      target_type: data.targetType,
+      target_service_type: data.targetServiceType,
+      start_date: data.startDate,
+      end_date: data.endDate,
+      max_usage: data.maxUsage,
+    });
+    return response.data;
+  }
+
+  async deletePromotion(promotionId: string): Promise<void> {
+    await this.client.delete(`/promotions/me/${promotionId}`);
+  }
+
+  async togglePromotionActive(promotionId: string): Promise<Promotion> {
+    const response = await this.client.patch<Promotion>(`/promotions/me/${promotionId}/toggle`);
     return response.data;
   }
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, addDays, isToday, isTomorrow, isPast, differenceInDays } from 'date-fns';
+import { format, isToday, isTomorrow, differenceInDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 import {
@@ -20,12 +20,14 @@ import {
   Sort,
 } from '@mui/icons-material';
 import {
+  Alert,
   Avatar,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Container,
   Divider,
   Grid,
@@ -44,78 +46,23 @@ import Breadcrumb from '@/components/common/Breadcrumb';
 import UISizeControl from '@/components/common/UISizeControl';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { api } from '@/lib/api';
+import type { ManagerDetail, Reservation } from '@/types';
 
-// 오늘 날짜 기준 샘플 데이터 생성
-const generateSampleReservations = () => {
-  const today = new Date();
-  return [
-    {
-      id: '1',
-      customerName: '김영희',
-      customerPhone: '010-1234-5678',
-      date: format(today, 'yyyy-MM-dd'),
-      time: '14:00',
-      estimatedHours: 3,
-      serviceType: 'full_care',
-      hospital: '서울대학교병원',
-      department: '내과',
-      status: 'confirmed',
-      memo: '휠체어 이용, 보호자 연락처: 010-9999-8888',
-    },
-    {
-      id: '2',
-      customerName: '이순자',
-      customerPhone: '010-2345-6789',
-      date: format(addDays(today, 1), 'yyyy-MM-dd'),
-      time: '09:00',
-      estimatedHours: 4,
-      serviceType: 'hospital_care',
-      hospital: '세브란스병원',
-      department: '정형외과',
-      status: 'confirmed',
-      memo: '정기 검진',
-    },
-    {
-      id: '3',
-      customerName: '박철수',
-      customerPhone: '010-3456-7890',
-      date: format(addDays(today, 2), 'yyyy-MM-dd'),
-      time: '10:30',
-      estimatedHours: 2,
-      serviceType: 'special_care',
-      hospital: '삼성서울병원',
-      department: '건강검진센터',
-      status: 'pending',
-      memo: '건강검진 동행',
-    },
-    {
-      id: '4',
-      customerName: '최영수',
-      customerPhone: '010-4567-8901',
-      date: format(addDays(today, 3), 'yyyy-MM-dd'),
-      time: '13:00',
-      estimatedHours: 3,
-      serviceType: 'full_care',
-      hospital: '아산병원',
-      department: '심장내과',
-      status: 'confirmed',
-      memo: '',
-    },
-    {
-      id: '5',
-      customerName: '정미영',
-      customerPhone: '010-5678-9012',
-      date: format(addDays(today, 5), 'yyyy-MM-dd'),
-      time: '11:00',
-      estimatedHours: 2,
-      serviceType: 'hospital_care',
-      hospital: '강남세브란스병원',
-      department: '피부과',
-      status: 'pending',
-      memo: '첫 방문 고객',
-    },
-  ];
-};
+// 대시보드용 예약 인터페이스 (UI에 필요한 필드)
+interface DashboardReservation {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  date: string;
+  time: string;
+  estimatedHours: number;
+  serviceType: string;
+  hospital: string;
+  department: string;
+  status: string;
+  memo: string;
+}
 
 const SERVICE_TYPE_LABELS: Record<string, { label: string; color: string; bgColor: string }> = {
   full_care: { label: '풀케어', color: '#0288D1', bgColor: '#E3F2FD' },
@@ -145,18 +92,60 @@ export default function CompanionDashboardPage() {
   const { user, isAuthenticated } = useAuthStore();
   const scale = useSettingsStore((state) => state.getScale());
 
-  const [reservations] = useState(generateSampleReservations);
+  const [managerProfile, setManagerProfile] = useState<ManagerDetail | null>(null);
+  const [reservations, setReservations] = useState<DashboardReservation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('date_asc');
   const [sortMenuAnchor, setSortMenuAnchor] = useState<null | HTMLElement>(null);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
+  // 매니저 프로필 및 예약 목록 조회
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // 매니저 프로필과 예약 목록을 병렬로 조회
+      const [profileData, reservationData] = await Promise.all([
+        api.getMyManagerProfile(),
+        api.getReservations({ limit: 20 }),
+      ]);
+
+      setManagerProfile(profileData);
+
+      // 예약 데이터를 대시보드용 형식으로 변환
+      const dashboardReservations: DashboardReservation[] = reservationData.items.map((r: Reservation) => ({
+        id: r.id,
+        customerName: r.userName || '고객',
+        customerPhone: r.userPhone || '',
+        date: r.scheduledDate,
+        time: r.scheduledTime,
+        estimatedHours: r.estimatedHours,
+        serviceType: r.serviceType,
+        hospital: r.hospitalName,
+        department: r.hospitalDepartment || '',
+        status: r.status,
+        memo: r.specialRequests || '',
+      }));
+
+      setReservations(dashboardReservations);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
     } else if (user?.role !== 'companion') {
       router.push('/');
+    } else {
+      fetchDashboardData();
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, fetchDashboardData]);
 
   // 정렬된 예약 목록
   const sortedReservations = useMemo(() => {
@@ -211,15 +200,29 @@ export default function CompanionDashboardPage() {
     return null;
   }
 
+  // 실제 프로필 데이터 또는 기본값
   const stats = {
-    totalServices: 47,
-    thisMonth: 8,
-    rating: 4.8,
-    responseRate: 95,
+    totalServices: managerProfile?.totalServices ?? 0,
+    thisMonth: reservations.filter(r => r.status === 'confirmed' || r.status === 'completed').length,
+    rating: managerProfile?.rating ?? 0,
+    responseRate: 95, // TODO: 백엔드에서 계산 필요
   };
 
   const pendingCount = reservations.filter(r => r.status === 'pending').length;
   const todayCount = reservations.filter(r => isToday(new Date(r.date))).length;
+
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Header />
+        <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+          <CircularProgress />
+        </Container>
+        <Footer />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
@@ -236,6 +239,13 @@ export default function CompanionDashboardPage() {
           />
           <UISizeControl />
         </Box>
+
+        {/* 에러 알림 */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
         {/* 환영 메시지 */}
         <Paper

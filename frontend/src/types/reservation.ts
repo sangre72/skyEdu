@@ -25,6 +25,10 @@ export interface Reservation {
   price: number;
   createdAt: string;
   updatedAt: string;
+  // 조회 시 추가 정보 (매니저가 조회할 때)
+  userName?: string;
+  userPhone?: string;
+  managerName?: string;
 }
 
 export interface CreateReservationRequest {

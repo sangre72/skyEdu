@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, addMonths } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -12,6 +12,7 @@ import {
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Container,
   Dialog,
   DialogActions,
@@ -21,7 +22,6 @@ import {
   FormControl,
   FormControlLabel,
   Grid,
-  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -40,7 +40,6 @@ import {
   Delete,
   Edit,
   LocalOffer,
-  NewReleases,
   Percent,
   Person,
   Schedule,
@@ -51,63 +50,8 @@ import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import UISizeControl from '@/components/common/UISizeControl';
 import { useSettingsStore } from '@/stores/settingsStore';
-
-// 프로모션 타입
-interface Promotion {
-  id: string;
-  type: 'percent' | 'fixed';
-  value: number;
-  description: string;
-  isActive: boolean;
-  targetType: 'all' | 'new_customer' | 'returning' | 'specific_service';
-  specificService?: string;
-  startDate: string;
-  endDate: string;
-  maxUsage?: number;
-  usageCount: number;
-  createdAt: string;
-}
-
-// 임시 프로모션 데이터
-const INITIAL_PROMOTIONS: Promotion[] = [
-  {
-    id: '1',
-    type: 'percent',
-    value: 20,
-    description: '신규 동행인 20% 할인',
-    isActive: true,
-    targetType: 'all',
-    startDate: '2024-12-01',
-    endDate: '2025-03-01',
-    maxUsage: 50,
-    usageCount: 12,
-    createdAt: '2024-12-01',
-  },
-  {
-    id: '2',
-    type: 'percent',
-    value: 10,
-    description: '첫 이용 고객 10% 할인',
-    isActive: true,
-    targetType: 'new_customer',
-    startDate: '2024-12-15',
-    endDate: '2025-06-30',
-    usageCount: 5,
-    createdAt: '2024-12-15',
-  },
-  {
-    id: '3',
-    type: 'fixed',
-    value: 5000,
-    description: '재방문 고객 5,000원 할인',
-    isActive: false,
-    targetType: 'returning',
-    startDate: '2024-11-01',
-    endDate: '2024-12-31',
-    usageCount: 8,
-    createdAt: '2024-11-01',
-  },
-];
+import { api } from '@/lib/api';
+import type { Promotion, DiscountType, DiscountTarget } from '@/types';
 
 const SERVICE_TYPES = [
   { code: 'full_care', name: '풀케어 (PRO)' },
@@ -126,33 +70,56 @@ export default function PromotionsSettingsPage() {
   const router = useRouter();
   const scale = useSettingsStore((state) => state.getScale());
 
-  const [promotions, setPromotions] = useState<Promotion[]>(INITIAL_PROMOTIONS);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // 새 프로모션 폼 상태
   const [formData, setFormData] = useState({
-    type: 'percent' as 'percent' | 'fixed',
-    value: 10,
+    name: '',
+    discountType: 'percent' as DiscountType,
+    discountValue: 10,
     description: '',
-    targetType: 'all' as 'all' | 'new_customer' | 'returning' | 'specific_service',
-    specificService: '',
+    targetType: 'all' as DiscountTarget,
+    targetServiceType: '',
     startDate: format(new Date(), 'yyyy-MM-dd'),
     endDate: format(addMonths(new Date(), 3), 'yyyy-MM-dd'),
     maxUsage: 0,
   });
+
+  // 프로모션 목록 조회
+  const fetchPromotions = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.getMyPromotions();
+      setPromotions(response.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '프로모션을 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPromotions();
+  }, [fetchPromotions]);
 
   // 다이얼로그 열기
   const handleOpenDialog = (promotion?: Promotion) => {
     if (promotion) {
       setEditingPromotion(promotion);
       setFormData({
-        type: promotion.type,
-        value: promotion.value,
-        description: promotion.description,
+        name: promotion.name,
+        discountType: promotion.discountType,
+        discountValue: promotion.discountValue,
+        description: promotion.description || '',
         targetType: promotion.targetType,
-        specificService: promotion.specificService || '',
+        targetServiceType: promotion.targetServiceType || '',
         startDate: promotion.startDate,
         endDate: promotion.endDate,
         maxUsage: promotion.maxUsage || 0,
@@ -160,11 +127,12 @@ export default function PromotionsSettingsPage() {
     } else {
       setEditingPromotion(null);
       setFormData({
-        type: 'percent',
-        value: 10,
+        name: '',
+        discountType: 'percent',
+        discountValue: 10,
         description: '',
         targetType: 'all',
-        specificService: '',
+        targetServiceType: '',
         startDate: format(new Date(), 'yyyy-MM-dd'),
         endDate: format(addMonths(new Date(), 3), 'yyyy-MM-dd'),
         maxUsage: 0,
@@ -180,47 +148,58 @@ export default function PromotionsSettingsPage() {
   };
 
   // 프로모션 저장
-  const handleSavePromotion = () => {
-    if (editingPromotion) {
-      // 수정
-      setPromotions((prev) =>
-        prev.map((p) =>
-          p.id === editingPromotion.id
-            ? {
-                ...p,
-                ...formData,
-              }
-            : p
-        )
-      );
-    } else {
-      // 새로 생성
-      const newPromotion: Promotion = {
-        id: Date.now().toString(),
-        ...formData,
-        isActive: true,
-        usageCount: 0,
-        createdAt: format(new Date(), 'yyyy-MM-dd'),
-      };
-      setPromotions((prev) => [newPromotion, ...prev]);
-    }
+  const handleSavePromotion = async () => {
+    try {
+      setIsSaving(true);
 
-    handleCloseDialog();
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+      const requestData = {
+        name: formData.name,
+        description: formData.description || undefined,
+        discountType: formData.discountType,
+        discountValue: formData.discountValue,
+        targetType: formData.targetType,
+        targetServiceType: formData.targetType === 'specific_service' ? formData.targetServiceType : undefined,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        maxUsage: formData.maxUsage > 0 ? formData.maxUsage : undefined,
+      };
+
+      if (editingPromotion) {
+        await api.updatePromotion(editingPromotion.id, requestData);
+      } else {
+        await api.createPromotion(requestData);
+      }
+
+      handleCloseDialog();
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+      await fetchPromotions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '프로모션 저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // 프로모션 활성화/비활성화 토글
-  const handleToggleActive = (id: string) => {
-    setPromotions((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p))
-    );
+  const handleToggleActive = async (id: string) => {
+    try {
+      await api.togglePromotionActive(id);
+      await fetchPromotions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '상태 변경에 실패했습니다.');
+    }
   };
 
   // 프로모션 삭제
-  const handleDeletePromotion = (id: string) => {
+  const handleDeletePromotion = async (id: string) => {
     if (window.confirm('정말 이 프로모션을 삭제하시겠습니까?')) {
-      setPromotions((prev) => prev.filter((p) => p.id !== id));
+      try {
+        await api.deletePromotion(id);
+        await fetchPromotions();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '프로모션 삭제에 실패했습니다.');
+      }
     }
   };
 
@@ -240,6 +219,19 @@ export default function PromotionsSettingsPage() {
     if (now > end) return { label: '종료', color: 'default' as const };
     return { label: '진행중', color: 'success' as const };
   };
+
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
+        <Header />
+        <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+          <CircularProgress />
+        </Container>
+        <Footer />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
@@ -273,6 +265,13 @@ export default function PromotionsSettingsPage() {
         {showSuccess && (
           <Alert severity="success" sx={{ mb: 3 }}>
             프로모션이 저장되었습니다! 고객 목록에서 프로모션이 표시됩니다.
+          </Alert>
+        )}
+
+        {/* 에러 알림 */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
           </Alert>
         )}
 
@@ -323,17 +322,17 @@ export default function PromotionsSettingsPage() {
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {promotion.type === 'percent' ? (
+                          {promotion.discountType === 'percent' ? (
                             <Chip
                               icon={<Percent sx={{ fontSize: 16 }} />}
-                              label={`${promotion.value}% 할인`}
+                              label={`${promotion.discountValue}% 할인`}
                               color="primary"
                               sx={{ fontSize: `${0.9 * scale}rem`, fontWeight: 600 }}
                             />
                           ) : (
                             <Chip
                               icon={<LocalOffer sx={{ fontSize: 16 }} />}
-                              label={`${promotion.value.toLocaleString()}원 할인`}
+                              label={`${promotion.discountValue.toLocaleString()}원 할인`}
                               color="secondary"
                               sx={{ fontSize: `${0.9 * scale}rem`, fontWeight: 600 }}
                             />
@@ -353,15 +352,20 @@ export default function PromotionsSettingsPage() {
                       </Box>
 
                       <Typography fontWeight={600} sx={{ mb: 1, fontSize: `${1.1 * scale}rem` }}>
-                        {promotion.description}
+                        {promotion.name}
                       </Typography>
+                      {promotion.description && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: `${0.9 * scale}rem` }}>
+                          {promotion.description}
+                        </Typography>
+                      )}
 
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Person sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: `${0.9 * scale}rem` }}>
                             {TARGET_TYPES.find((t) => t.code === promotion.targetType)?.name}
-                            {promotion.specificService && ` (${SERVICE_TYPES.find((s) => s.code === promotion.specificService)?.name})`}
+                            {promotion.targetServiceType && ` (${SERVICE_TYPES.find((s) => s.code === promotion.targetServiceType)?.name})`}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -373,7 +377,7 @@ export default function PromotionsSettingsPage() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Star sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: `${0.9 * scale}rem` }}>
-                            사용 횟수: {promotion.usageCount}회
+                            사용 횟수: {promotion.usedCount}회
                             {promotion.maxUsage && promotion.maxUsage > 0 && ` / ${promotion.maxUsage}회`}
                           </Typography>
                         </Box>
@@ -438,6 +442,16 @@ export default function PromotionsSettingsPage() {
         </DialogTitle>
         <DialogContent dividers>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+            {/* 프로모션 이름 */}
+            <TextField
+              label="프로모션 이름"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="예: 신규 동행인 20% 할인"
+              helperText="고객에게 표시되는 프로모션 제목입니다."
+              sx={{ '& .MuiInputBase-input': { fontSize: `${1 * scale}rem` } }}
+            />
+
             {/* 할인 유형 */}
             <FormControl>
               <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, fontSize: `${0.95 * scale}rem` }}>
@@ -445,8 +459,8 @@ export default function PromotionsSettingsPage() {
               </Typography>
               <RadioGroup
                 row
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as 'percent' | 'fixed' })}
+                value={formData.discountType}
+                onChange={(e) => setFormData({ ...formData, discountType: e.target.value as DiscountType })}
               >
                 <FormControlLabel
                   value="percent"
@@ -463,31 +477,32 @@ export default function PromotionsSettingsPage() {
 
             {/* 할인 금액/비율 */}
             <TextField
-              label={formData.type === 'percent' ? '할인율 (%)' : '할인 금액 (원)'}
+              label={formData.discountType === 'percent' ? '할인율 (%)' : '할인 금액 (원)'}
               type="number"
-              value={formData.value}
-              onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
+              value={formData.discountValue}
+              onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    {formData.type === 'percent' ? '%' : '원'}
+                    {formData.discountType === 'percent' ? '%' : '원'}
                   </InputAdornment>
                 ),
               }}
               inputProps={{
                 min: 1,
-                max: formData.type === 'percent' ? 100 : 100000,
+                max: formData.discountType === 'percent' ? 100 : 100000,
               }}
               sx={{ '& .MuiInputBase-input': { fontSize: `${1 * scale}rem` } }}
             />
 
-            {/* 프로모션 설명 */}
+            {/* 프로모션 설명 (선택) */}
             <TextField
-              label="프로모션 설명"
+              label="상세 설명 (선택)"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="예: 신규 동행인 20% 할인"
-              helperText="고객에게 표시되는 프로모션 설명입니다."
+              placeholder="예: 12월 한정 특별 할인"
+              multiline
+              rows={2}
               sx={{ '& .MuiInputBase-input': { fontSize: `${1 * scale}rem` } }}
             />
 
@@ -497,7 +512,7 @@ export default function PromotionsSettingsPage() {
               <Select
                 value={formData.targetType}
                 label="적용 대상"
-                onChange={(e) => setFormData({ ...formData, targetType: e.target.value as typeof formData.targetType })}
+                onChange={(e) => setFormData({ ...formData, targetType: e.target.value as DiscountTarget })}
                 sx={{ fontSize: `${1 * scale}rem` }}
               >
                 {TARGET_TYPES.map((target) => (
@@ -518,9 +533,9 @@ export default function PromotionsSettingsPage() {
               <FormControl fullWidth>
                 <InputLabel sx={{ fontSize: `${0.95 * scale}rem` }}>서비스 유형</InputLabel>
                 <Select
-                  value={formData.specificService}
+                  value={formData.targetServiceType}
                   label="서비스 유형"
-                  onChange={(e) => setFormData({ ...formData, specificService: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, targetServiceType: e.target.value })}
                   sx={{ fontSize: `${1 * scale}rem` }}
                 >
                   {SERVICE_TYPES.map((service) => (
@@ -571,16 +586,16 @@ export default function PromotionsSettingsPage() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseDialog} sx={{ fontSize: `${0.95 * scale}rem` }}>
+          <Button onClick={handleCloseDialog} sx={{ fontSize: `${0.95 * scale}rem` }} disabled={isSaving}>
             취소
           </Button>
           <Button
             variant="contained"
             onClick={handleSavePromotion}
-            disabled={!formData.description || formData.value <= 0}
+            disabled={!formData.name || formData.discountValue <= 0 || isSaving}
             sx={{ fontSize: `${0.95 * scale}rem` }}
           >
-            {editingPromotion ? '수정하기' : '추가하기'}
+            {isSaving ? <CircularProgress size={20} /> : (editingPromotion ? '수정하기' : '추가하기')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -68,3 +68,17 @@ export interface ScheduleUpdateRequest {
   endTime?: string;
   isAvailable?: boolean;
 }
+
+export interface ManagerUpdateRequest {
+  introduction?: string;
+  certifications?: string[];
+  availableAreas?: string[];
+  profileImage?: string;
+  bankName?: string;
+  bankAccount?: string;
+}
+
+export interface ManagerDetail extends Manager {
+  reviewsCount: number;
+  avgRating: number;
+}
