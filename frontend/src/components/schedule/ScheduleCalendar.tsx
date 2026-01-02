@@ -22,7 +22,7 @@ export interface CalendarEvent {
   title: string;
   start: Date;
   end: Date;
-  type: 'available' | 'reservation' | 'recurring';
+  type: 'available' | 'unavailable' | 'reservation' | 'recurring';
   customerName?: string;
   customerPhone?: string;
   hospitalName?: string;
@@ -74,6 +74,9 @@ export default function ScheduleCalendar({
       } else if (event.type === 'recurring') {
         backgroundColor = '#7C3AED'; // 보라색 (반복)
         borderColor = '#5B21B6';
+      } else if (event.type === 'unavailable') {
+        backgroundColor = '#9E9E9E'; // 회색 (휴무)
+        borderColor = '#616161';
       }
 
       return {

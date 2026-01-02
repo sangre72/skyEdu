@@ -6,13 +6,17 @@ import type {
   CreateReservationRequest,
   LoginRequest,
   Manager,
+  ManagerCreateRequest,
   ManagerListResponse,
+  ManagerSchedule,
   PhoneVerifyConfirmRequest,
   PhoneVerifyResponse,
   PhoneVerifySendRequest,
   RegisterRequest,
   Reservation,
   ReservationListResponse,
+  ScheduleCreateRequest,
+  ScheduleUpdateRequest,
   UserUpdateRequest,
   UserWithProfile,
 } from '@/types';
@@ -141,6 +145,61 @@ class ApiClient {
   async getManager(id: string): Promise<Manager> {
     const response = await this.client.get<Manager>(`/managers/${id}`);
     return response.data;
+  }
+
+  async registerManager(data: ManagerCreateRequest): Promise<Manager> {
+    const response = await this.client.post<Manager>('/managers/register', data);
+    return response.data;
+  }
+
+  // ============ Schedules ============
+  async getMySchedules(params?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ManagerSchedule[]> {
+    const response = await this.client.get<ManagerSchedule[]>('/managers/me/schedules', {
+      params: {
+        start_date: params?.startDate,
+        end_date: params?.endDate,
+      },
+    });
+    return response.data;
+  }
+
+  async getManagerSchedules(managerId: string, params?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ManagerSchedule[]> {
+    const response = await this.client.get<ManagerSchedule[]>(`/managers/${managerId}/schedules`, {
+      params: {
+        start_date: params?.startDate,
+        end_date: params?.endDate,
+      },
+    });
+    return response.data;
+  }
+
+  async createSchedule(data: ScheduleCreateRequest): Promise<ManagerSchedule> {
+    const response = await this.client.post<ManagerSchedule>('/managers/me/schedules', {
+      date: data.date,
+      start_time: data.startTime,
+      end_time: data.endTime,
+      is_available: data.isAvailable,
+    });
+    return response.data;
+  }
+
+  async updateSchedule(scheduleId: string, data: ScheduleUpdateRequest): Promise<ManagerSchedule> {
+    const response = await this.client.patch<ManagerSchedule>(`/managers/me/schedules/${scheduleId}`, {
+      start_time: data.startTime,
+      end_time: data.endTime,
+      is_available: data.isAvailable,
+    });
+    return response.data;
+  }
+
+  async deleteSchedule(scheduleId: string): Promise<void> {
+    await this.client.delete(`/managers/me/schedules/${scheduleId}`);
   }
 
   // ============ Users ============

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 import {
@@ -35,6 +35,8 @@ import Footer from '@/components/common/Footer';
 import Breadcrumb from '@/components/common/Breadcrumb';
 import UISizeControl from '@/components/common/UISizeControl';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { api } from '@/lib/api';
+import type { ManagerSchedule } from '@/types';
 import type { CalendarEvent, SlotInfo } from '@/components/schedule/ScheduleCalendar';
 
 // 캘린더 컴포넌트를 dynamic import (SSR 비활성화)
@@ -90,35 +92,11 @@ export default function CompanionSchedulePage() {
   const today = useMemo(() => new Date(), []);
 
   // 이벤트 데이터
-  const [events, setEvents] = useState<CalendarEvent[]>(() => {
-    // 샘플 예약 데이터
-    const now = new Date();
-    const sampleReservations: CalendarEvent[] = [
-      {
-        id: 'res-1',
-        title: '김*수 - 서울대병원',
-        start: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 9, 0),
-        end: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 12, 0),
-        type: 'reservation',
-        customerName: '김*수',
-        customerPhone: '010-1234-5678',
-        hospitalName: '서울대병원',
-        status: 'confirmed',
-      },
-      {
-        id: 'res-2',
-        title: '이*영 - 삼성서울병원',
-        start: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5, 14, 0),
-        end: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5, 17, 0),
-        type: 'reservation',
-        customerName: '이*영',
-        customerPhone: '010-5678-9012',
-        hospitalName: '삼성서울병원',
-        status: 'confirmed',
-      },
-    ];
-    return sampleReservations;
-  });
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+
+  // 스케줄 ID 맵 (이벤트 ID -> 스케줄 ID)
+  const [scheduleIdMap, setScheduleIdMap] = useState<Map<string, string>>(new Map());
 
   // 다이얼로그 상태
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -133,7 +111,80 @@ export default function CompanionSchedulePage() {
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // 스케줄 데이터를 CalendarEvent로 변환
+  const convertScheduleToEvent = useCallback((schedule: ManagerSchedule): CalendarEvent => {
+    const [year, month, day] = schedule.date.split('-').map(Number);
+    const [startHour, startMin] = schedule.startTime.split(':').map(Number);
+    const [endHour, endMin] = schedule.endTime.split(':').map(Number);
+
+    const start = new Date(year, month - 1, day, startHour, startMin);
+    const end = new Date(year, month - 1, day, endHour, endMin);
+
+    return {
+      id: `schedule-${schedule.id}`,
+      title: schedule.isAvailable ? '가능 시간' : '휴무',
+      start,
+      end,
+      type: schedule.isAvailable ? 'available' : 'unavailable',
+    };
+  }, []);
+
+  // 스케줄 로드
+  const loadSchedules = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // 현재 월 ±1개월 범위 조회
+      const startDate = format(startOfMonth(addMonths(currentMonth, -1)), 'yyyy-MM-dd');
+      const endDate = format(endOfMonth(addMonths(currentMonth, 1)), 'yyyy-MM-dd');
+
+      const schedules = await api.getMySchedules({ startDate, endDate });
+
+      // 스케줄을 이벤트로 변환
+      const scheduleEvents = schedules.map(convertScheduleToEvent);
+
+      // ID 맵 업데이트
+      const newMap = new Map<string, string>();
+      schedules.forEach((schedule) => {
+        newMap.set(`schedule-${schedule.id}`, schedule.id);
+      });
+      setScheduleIdMap(newMap);
+
+      // TODO: 예약 데이터도 함께 로드
+      // const reservations = await api.getMyReservations({ startDate, endDate });
+
+      // 샘플 예약 데이터 (임시)
+      const now = new Date();
+      const sampleReservations: CalendarEvent[] = [
+        {
+          id: 'res-1',
+          title: '김*수 - 서울대병원',
+          start: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 9, 0),
+          end: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 12, 0),
+          type: 'reservation',
+          customerName: '김*수',
+          customerPhone: '010-1234-5678',
+          hospitalName: '서울대병원',
+          status: 'confirmed',
+        },
+      ];
+
+      setEvents([...scheduleEvents, ...sampleReservations]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '스케줄을 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentMonth, convertScheduleToEvent]);
+
+  // 초기 로드
+  useEffect(() => {
+    loadSchedules();
+  }, [loadSchedules]);
 
   // 슬롯 선택 (새 이벤트 생성)
   const handleSelectSlot = useCallback(
@@ -167,78 +218,118 @@ export default function CompanionSchedulePage() {
   }, []);
 
   // 이벤트 저장
-  const handleSaveEvent = () => {
-    const [startHour, startMin] = editStartTime.split(':').map(Number);
-    const [endHour, endMin] = editEndTime.split(':').map(Number);
+  const handleSaveEvent = async () => {
+    setIsSaving(true);
+    setError('');
 
-    const newStart = new Date(editDate);
-    newStart.setHours(startHour, startMin, 0);
-    const newEnd = new Date(editDate);
-    newEnd.setHours(endHour, endMin, 0);
+    try {
+      const [startHour, startMin] = editStartTime.split(':').map(Number);
+      const [endHour, endMin] = editEndTime.split(':').map(Number);
 
-    if (isNewEvent) {
-      // 새 이벤트 생성
-      const newEvent: CalendarEvent = {
-        id: `avail-${Date.now()}`,
-        title: '가능 시간',
-        start: newStart,
-        end: newEnd,
-        type: 'available',
-        isRecurring,
-        recurringDays: isRecurring ? recurringDays : undefined,
-      };
+      if (isNewEvent) {
+        // 새 이벤트 생성
+        if (isRecurring && recurringDays.length > 0) {
+          // 반복 이벤트: 향후 4주간 생성
+          const createdSchedules: ManagerSchedule[] = [];
 
-      if (isRecurring && recurringDays.length > 0) {
-        // 반복 이벤트: 향후 4주간 생성
-        const recurringEvents: CalendarEvent[] = [];
-        for (let week = 0; week < 4; week++) {
-          recurringDays.forEach((day) => {
-            const eventDate = new Date(editDate);
-            const diff = day - editDate.getDay() + week * 7;
-            eventDate.setDate(editDate.getDate() + diff);
+          for (let week = 0; week < 4; week++) {
+            for (const day of recurringDays) {
+              const eventDate = new Date(editDate);
+              const diff = day - editDate.getDay() + week * 7;
+              eventDate.setDate(editDate.getDate() + diff);
 
-            if (eventDate >= today) {
-              const start = new Date(eventDate);
-              start.setHours(startHour, startMin, 0);
-              const end = new Date(eventDate);
-              end.setHours(endHour, endMin, 0);
-
-              recurringEvents.push({
-                id: `avail-${Date.now()}-${week}-${day}`,
-                title: '가능 시간 (반복)',
-                start,
-                end,
-                type: 'recurring',
-                isRecurring: true,
-                recurringDays,
-              });
+              if (eventDate >= today) {
+                const schedule = await api.createSchedule({
+                  date: format(eventDate, 'yyyy-MM-dd'),
+                  startTime: editStartTime,
+                  endTime: editEndTime,
+                  isAvailable: true,
+                });
+                createdSchedules.push(schedule);
+              }
             }
+          }
+
+          // UI 업데이트
+          const newEvents = createdSchedules.map(convertScheduleToEvent);
+          setEvents((prev) => [...prev, ...newEvents]);
+
+          // ID 맵 업데이트
+          setScheduleIdMap((prev) => {
+            const newMap = new Map(prev);
+            createdSchedules.forEach((schedule) => {
+              newMap.set(`schedule-${schedule.id}`, schedule.id);
+            });
+            return newMap;
+          });
+        } else {
+          // 단일 이벤트 생성
+          const schedule = await api.createSchedule({
+            date: format(editDate, 'yyyy-MM-dd'),
+            startTime: editStartTime,
+            endTime: editEndTime,
+            isAvailable: true,
+          });
+
+          const newEvent = convertScheduleToEvent(schedule);
+          setEvents((prev) => [...prev, newEvent]);
+
+          // ID 맵 업데이트
+          setScheduleIdMap((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(`schedule-${schedule.id}`, schedule.id);
+            return newMap;
           });
         }
-        setEvents((prev) => [...prev, ...recurringEvents]);
-      } else {
-        setEvents((prev) => [...prev, newEvent]);
-      }
-    } else if (selectedEvent && selectedEvent.type !== 'reservation') {
-      // 기존 이벤트 수정
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === selectedEvent.id
-            ? { ...e, start: newStart, end: newEnd, isRecurring, recurringDays }
-            : e
-        )
-      );
-    }
+      } else if (selectedEvent && selectedEvent.type !== 'reservation') {
+        // 기존 이벤트 수정
+        const scheduleId = scheduleIdMap.get(selectedEvent.id);
+        if (scheduleId) {
+          const updatedSchedule = await api.updateSchedule(scheduleId, {
+            startTime: editStartTime,
+            endTime: editEndTime,
+            isAvailable: true,
+          });
 
-    setDialogOpen(false);
+          const updatedEvent = convertScheduleToEvent(updatedSchedule);
+          setEvents((prev) =>
+            prev.map((e) => (e.id === selectedEvent.id ? updatedEvent : e))
+          );
+        }
+      }
+
+      setDialogOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // 이벤트 삭제
-  const handleDeleteEvent = () => {
-    if (selectedEvent && selectedEvent.type !== 'reservation') {
-      setEvents((prev) => prev.filter((e) => e.id !== selectedEvent.id));
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent || selectedEvent.type === 'reservation') return;
+
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const scheduleId = scheduleIdMap.get(selectedEvent.id);
+      if (scheduleId) {
+        await api.deleteSchedule(scheduleId);
+        setEvents((prev) => prev.filter((e) => e.id !== selectedEvent.id));
+        setScheduleIdMap((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(selectedEvent.id);
+          return newMap;
+        });
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '삭제에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
     }
-    setDialogOpen(false);
   };
 
   // 반복 요일 토글
@@ -248,7 +339,7 @@ export default function CompanionSchedulePage() {
     );
   };
 
-  // 전체 저장
+  // 설정 완료
   const handleSubmit = async () => {
     const availableEvents = events.filter((e) => e.type === 'available' || e.type === 'recurring');
     if (availableEvents.length === 0) {
@@ -256,17 +347,8 @@ export default function CompanionSchedulePage() {
       return;
     }
 
-    setIsLoading(true);
-    setError('');
-
-    try {
-      // TODO: API 호출
-      router.push('/companion/dashboard');
-    } catch {
-      setError('저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setIsLoading(false);
-    }
+    // 모든 스케줄은 실시간으로 저장되므로, 완료 시 대시보드로 이동
+    router.push('/companion/dashboard');
   };
 
   // 캘린더 높이 계산
@@ -314,12 +396,20 @@ export default function CompanionSchedulePage() {
           </Box>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
               {error}
             </Alert>
           )}
 
-          {/* 범례 */}
+          {isLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          )}
+
+          {!isLoading && (
+            <>
+              {/* 범례 */}
           <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
             <Chip
               size="small"
@@ -383,17 +473,19 @@ export default function CompanionSchedulePage() {
             </Typography>
           </Box>
 
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            startIcon={<Save />}
-            onClick={handleSubmit}
-            disabled={isLoading}
-            sx={{ fontSize: `${1 * scale}rem`, py: 1.5 }}
-          >
-            {isLoading ? '저장 중...' : '설정 완료'}
-          </Button>
+              <Button
+                fullWidth
+                variant="contained"
+                size="large"
+                startIcon={<Save />}
+                onClick={handleSubmit}
+                disabled={isLoading || isSaving}
+                sx={{ fontSize: `${1 * scale}rem`, py: 1.5 }}
+              >
+                설정 완료
+              </Button>
+            </>
+          )}
         </Paper>
       </Container>
 
@@ -553,23 +645,29 @@ export default function CompanionSchedulePage() {
               onClick={handleDeleteEvent}
               color="error"
               startIcon={<Delete />}
+              disabled={isSaving}
               sx={{ fontSize: `${0.9 * scale}rem` }}
             >
               삭제
             </Button>
           )}
           <Box sx={{ flex: 1 }} />
-          <Button onClick={() => setDialogOpen(false)} sx={{ fontSize: `${0.9 * scale}rem` }}>
+          <Button
+            onClick={() => setDialogOpen(false)}
+            disabled={isSaving}
+            sx={{ fontSize: `${0.9 * scale}rem` }}
+          >
             {selectedEvent?.type === 'reservation' ? '닫기' : '취소'}
           </Button>
           {selectedEvent?.type !== 'reservation' && (
             <Button
               variant="contained"
               onClick={handleSaveEvent}
-              startIcon={isNewEvent ? <Add /> : <Save />}
+              startIcon={isSaving ? <CircularProgress size={20} /> : isNewEvent ? <Add /> : <Save />}
+              disabled={isSaving}
               sx={{ fontSize: `${0.9 * scale}rem` }}
             >
-              {isNewEvent ? '등록' : '저장'}
+              {isSaving ? '처리 중...' : isNewEvent ? '등록' : '저장'}
             </Button>
           )}
         </DialogActions>

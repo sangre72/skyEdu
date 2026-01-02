@@ -22,6 +22,8 @@ import StepIntroduction from '@/components/companion/register/StepIntroduction';
 import StepAreaSelection from '@/components/companion/register/StepAreaSelection';
 import StepCertification from '@/components/companion/register/StepCertification';
 import { useAuthStore } from '@/stores/authStore';
+import { api } from '@/lib/api';
+import type { ManagerCreateRequest } from '@/types';
 
 const STEPS = [
   { label: '휴대폰 인증' },
@@ -141,22 +143,24 @@ export default function CompanionRegisterPage() {
     setError('');
 
     try {
-      // TODO: API 호출 - 동행인 프로필 등록
-      // await api.post('/managers/register', {
-      //   phone: phone.replace(/-/g, ''),
-      //   name,
-      //   introduction,
-      //   available_areas: selectedAreas,
-      //   certifications: selectedCerts,
-      // });
+      // 동행인 프로필 등록 API 호출
+      const requestData: ManagerCreateRequest = {
+        introduction,
+        availableAreas: selectedAreas,
+        certifications: selectedCerts,
+      };
 
-      // Mock: 1초 대기
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await api.registerManager(requestData);
 
       // 스케줄 설정 페이지로 이동
       router.push('/companion/schedule');
-    } catch {
-      setError('등록에 실패했습니다. 다시 시도해주세요.');
+    } catch (err) {
+      // 에러 메시지 처리
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('등록에 실패했습니다. 다시 시도해주세요.');
+      }
     } finally {
       setIsLoading(false);
     }

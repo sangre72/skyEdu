@@ -42,9 +42,38 @@ import { getLocationByIP } from '@/lib/geolocation';
 import { useLocationStore } from '@/stores/locationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useRegions } from '@/hooks/useRegions';
+import { useCompanions } from '@/hooks/useCompanions';
 
-// 임시 동행인 데이터 (2depth 지역 코드 사용)
-const MOCK_COMPANIONS = [
+// Companion UI 타입 정의
+interface CompanionDiscount {
+  type: 'percent' | 'fixed';
+  value: number;
+  description: string;
+}
+
+interface CompanionCertification {
+  type: string;
+  name: string;
+  isVerified: boolean;
+}
+
+interface Companion {
+  id: string;
+  name: string;
+  introduction: string;
+  serviceAreas: string[];
+  certifications: CompanionCertification[];
+  rating: number;
+  totalServices: number;
+  reviewCount: number;
+  isAvailable: boolean;
+  isNew: boolean;
+  discount: CompanionDiscount | null;
+  blogPostCount: number;
+}
+
+// MOCK 데이터 (폴백용)
+const MOCK_COMPANIONS_FALLBACK = [
   {
     id: '1',
     name: '김미영',
@@ -186,6 +215,22 @@ export default function CompanionsPage() {
   const [sortBy, setSortBy] = useState<'rating' | 'services' | 'reviews'>('rating');
   const [isLocationLoading, setIsLocationLoading] = useState(true);
   const [showAllRegions, setShowAllRegions] = useState(false);
+  const [page, setPage] = useState(1);
+  const [apiArea, setApiArea] = useState<string | undefined>(undefined);
+
+  // API 호출 (지역 필터 변경 시 area 파라미터 업데이트)
+  const {
+    companions: apiCompanions,
+    total,
+    isLoading: isCompanionsLoading,
+    error: companionsError,
+    refetch,
+  } = useCompanions({
+    page,
+    limit: 20,
+    area: apiArea,
+    autoFetch: true,
+  });
 
   // 초기 지역 설정 (저장된 값 또는 감지된 값)
   useEffect(() => {
@@ -230,6 +275,20 @@ export default function CompanionsPage() {
 
     initLocation();
   }, [savedProvince, savedDistrict, detectedProvince, detectedDistrict, setDetectedLocation, setIsDetecting]);
+
+  // 지역 필터 변경 시 API area 파라미터 업데이트
+  useEffect(() => {
+    if (showAllRegions) {
+      setApiArea(undefined);
+    } else if (selectedDistrict) {
+      setApiArea(selectedDistrict);
+    } else if (selectedProvince) {
+      setApiArea(selectedProvince);
+    } else {
+      setApiArea(undefined);
+    }
+    setPage(1); // 필터 변경 시 첫 페이지로 이동
+  }, [selectedProvince, selectedDistrict, showAllRegions]);
 
   // 시/도 변경 시 시/군/구 초기화
   const handleProvinceChange = (province: string) => {
@@ -281,26 +340,38 @@ export default function CompanionsPage() {
     return getDistrictsByProvince(selectedProvince);
   }, [selectedProvince, getDistrictsByProvince]);
 
-  // 필터링 및 정렬
-  const filteredCompanions = useMemo(() => {
-    let result = [...MOCK_COMPANIONS];
-
-    // 전국 보기가 아닐 때만 지역 필터 적용
-    if (!showAllRegions) {
-      // 시/도 필터
-      if (selectedProvince) {
-        result = result.filter((c) =>
-          c.serviceAreas.some((area) => area.startsWith(selectedProvince))
-        );
-      }
-
-      // 시/군/구 필터
-      if (selectedDistrict) {
-        result = result.filter((c) => c.serviceAreas.includes(selectedDistrict));
-      }
+  // API 데이터 변환 (백엔드 Manager → 프론트엔드 Companion 형식)
+  const transformedCompanions = useMemo((): Companion[] => {
+    if (companionsError || apiCompanions.length === 0) {
+      // 에러 발생 시 또는 데이터 없을 때 빈 배열 반환
+      return [];
     }
 
-    // 자격증 필터
+    return apiCompanions.map((manager): Companion => ({
+      id: manager.id,
+      name: manager.name || '익명',
+      introduction: manager.introduction || '',
+      serviceAreas: manager.availableAreas,
+      certifications: manager.certifications.map((cert) => ({
+        type: cert,
+        name: CERTIFICATION_TYPES.find((c) => c.code === cert)?.name || cert,
+        isVerified: manager.status === 'active', // 활성 매니저는 인증된 것으로 간주
+      })),
+      rating: manager.rating,
+      totalServices: manager.totalServices,
+      reviewCount: 0, // TODO: 리뷰 API 연동 후 업데이트
+      isAvailable: manager.status === 'active',
+      isNew: manager.grade === 'new',
+      discount: null, // TODO: 프로모션 API 연동 후 업데이트
+      blogPostCount: 0, // TODO: 블로그 API 연동 후 업데이트
+    }));
+  }, [apiCompanions, companionsError]);
+
+  // 필터링 및 정렬 (클라이언트 측)
+  const filteredCompanions = useMemo(() => {
+    let result = [...transformedCompanions];
+
+    // 자격증 필터 (클라이언트 측에서만 적용)
     if (selectedCert) {
       result = result.filter((c) =>
         c.certifications.some((cert) => cert.type === selectedCert)
@@ -321,7 +392,7 @@ export default function CompanionsPage() {
     }
 
     return result;
-  }, [selectedProvince, selectedDistrict, selectedCert, sortBy, showAllRegions]);
+  }, [transformedCompanions, selectedCert, sortBy]);
 
   // 지역명 가져오기 (useRegions 훅에서 제공)
   const getAreaName = (code: string) => {
@@ -533,13 +604,71 @@ export default function CompanionsPage() {
         {/* 결과 헤더 */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="body1" sx={{ fontSize: `${1 * scale}rem` }}>
-            <strong>{filteredCompanions.length}</strong>명의 동행인을 찾았어요
-            {filteredCompanions.length > 0 && ' 😊'}
+            {isCompanionsLoading ? (
+              <Skeleton width={150} height={24} />
+            ) : companionsError ? (
+              <span style={{ color: '#EF4444' }}>동행인을 불러올 수 없습니다</span>
+            ) : (
+              <>
+                <strong>{filteredCompanions.length}</strong>명의 동행인을 찾았어요
+                {filteredCompanions.length > 0 && ' 😊'}
+              </>
+            )}
           </Typography>
         </Box>
 
-        {/* 결과 목록 */}
-        {filteredCompanions.length === 0 ? (
+        {/* 에러 상태 */}
+        {companionsError && !isCompanionsLoading && (
+          <Paper
+            sx={{
+              textAlign: 'center',
+              py: 8,
+              px: 3,
+              bgcolor: '#FFEBEE',
+              borderRadius: 3,
+              mb: 4,
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 2, fontSize: `${1.2 * scale}rem`, color: '#EF4444' }}>
+              동행인 목록을 불러오는데 실패했습니다
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 3, fontSize: `${0.95 * scale}rem` }}>
+              {companionsError}
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => refetch()}
+              sx={{ fontSize: `${1 * scale}rem` }}
+            >
+              다시 시도
+            </Button>
+          </Paper>
+        )}
+
+        {/* 로딩 상태 */}
+        {isCompanionsLoading && (
+          <Grid container spacing={3}>
+            {[1, 2, 3, 4].map((i) => (
+              <Grid item xs={12} md={6} key={i}>
+                <Card>
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <Skeleton variant="circular" width={72} height={72} />
+                      <Box sx={{ flex: 1 }}>
+                        <Skeleton width="40%" height={28} sx={{ mb: 1 }} />
+                        <Skeleton width="60%" height={20} sx={{ mb: 2 }} />
+                        <Skeleton width="100%" height={40} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
+        {/* 빈 결과 */}
+        {!isCompanionsLoading && !companionsError && filteredCompanions.length === 0 && (
           <Paper
             sx={{
               textAlign: 'center',
@@ -581,7 +710,10 @@ export default function CompanionsPage() {
               </Button>
             </Box>
           </Paper>
-        ) : (
+        )}
+
+        {/* 동행인 목록 */}
+        {!isCompanionsLoading && !companionsError && filteredCompanions.length > 0 && (
           <Grid container spacing={3}>
             {filteredCompanions.map((companion) => (
               <Grid item xs={12} md={6} key={companion.id}>

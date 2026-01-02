@@ -5,8 +5,8 @@ export type ManagerGrade = 'new' | 'regular' | 'premium';
 export interface Manager {
   id: string;
   userId: string;
-  name: string;
-  phone: string;
+  name?: string;
+  phone?: string;
   profileImage?: string;
   status: ManagerStatus;
   grade: ManagerGrade;
@@ -16,6 +16,9 @@ export interface Manager {
   availableAreas: string[];
   introduction?: string;
   createdAt: string;
+  // 상세 조회 시 추가 정보
+  reviewsCount?: number;
+  avgRating?: number;
 }
 
 export interface ManagerSchedule {
@@ -46,3 +49,22 @@ export const MANAGER_GRADE_LABELS: Record<ManagerGrade, string> = {
   regular: '일반',
   premium: '우수',
 };
+
+export interface ManagerCreateRequest {
+  introduction: string;
+  certifications: string[];
+  availableAreas: string[];
+}
+
+export interface ScheduleCreateRequest {
+  date: string;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
+}
+
+export interface ScheduleUpdateRequest {
+  startTime?: string;
+  endTime?: string;
+  isAvailable?: boolean;
+}
