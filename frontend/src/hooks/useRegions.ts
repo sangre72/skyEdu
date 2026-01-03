@@ -7,11 +7,15 @@ export interface Province {
   code: string;
   name: string;
   shortName: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface District {
   code: string;
   name: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface RegionData {

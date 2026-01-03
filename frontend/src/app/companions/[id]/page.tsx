@@ -167,7 +167,7 @@ export default function CompanionDetailPage() {
               {/* 프로필 헤더 */}
               <Box sx={{ textAlign: 'center', mb: 3 }}>
                 <Avatar
-                  src={companion.profileImage}
+                  src={companion.profile_image}
                   sx={{
                     width: 120,
                     height: 120,
@@ -191,9 +191,9 @@ export default function CompanionDetailPage() {
                   <Chip label="현재 예약 불가" color="default" size="small" sx={{ mb: 1 }} />
                 )}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                  <Rating value={companion.rating} precision={0.1} size="small" readOnly />
+                  <Rating value={Number(companion.rating)} precision={0.1} size="small" readOnly />
                   <Typography fontWeight={600} sx={{ fontSize: `${1 * scale}rem` }}>
-                    {companion.rating.toFixed(1)}
+                    {Number(companion.rating).toFixed(1)}
                   </Typography>
                 </Box>
               </Box>
@@ -204,7 +204,7 @@ export default function CompanionDetailPage() {
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={4} sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" fontWeight={700} color="primary" sx={{ fontSize: `${1.3 * scale}rem` }}>
-                    {companion.totalServices}
+                    {companion.total_services}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: `${0.75 * scale}rem` }}>
                     동행 횟수
@@ -212,7 +212,7 @@ export default function CompanionDetailPage() {
                 </Grid>
                 <Grid item xs={4} sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" fontWeight={700} color="primary" sx={{ fontSize: `${1.3 * scale}rem` }}>
-                    {companion.reviewsCount ?? 0}
+                    {companion.reviews_count ?? 0}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: `${0.75 * scale}rem` }}>
                     후기
@@ -220,7 +220,7 @@ export default function CompanionDetailPage() {
                 </Grid>
                 <Grid item xs={4} sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" fontWeight={700} color="primary" sx={{ fontSize: `${1.3 * scale}rem` }}>
-                    {companion.avgRating ? companion.avgRating.toFixed(1) : '-'}
+                    {companion.avg_rating ? Number(companion.avg_rating).toFixed(1) : '-'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: `${0.75 * scale}rem` }}>
                     평균 평점
@@ -233,7 +233,7 @@ export default function CompanionDetailPage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <WorkHistory sx={{ fontSize: 20, color: 'text.secondary' }} />
                   <Typography variant="body2" sx={{ fontSize: `${0.9 * scale}rem` }}>
-                    {format(new Date(companion.createdAt), 'yyyy년 M월', { locale: ko })}부터 활동
+                    {format(new Date(companion.created_at), 'yyyy년 M월', { locale: ko })}부터 활동
                   </Typography>
                 </Box>
               </Box>
@@ -261,13 +261,13 @@ export default function CompanionDetailPage() {
               )}
 
               {/* 서비스 지역 */}
-              {companion.availableAreas.length > 0 && (
+              {companion.available_areas.length > 0 && (
                 <>
                   <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, fontSize: `${0.95 * scale}rem` }}>
                     서비스 지역
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 3 }}>
-                    {companion.availableAreas.map((area, i) => (
+                    {companion.available_areas.map((area: string, i: number) => (
                       <Chip
                         key={i}
                         icon={<LocationOn sx={{ fontSize: 14 }} />}
@@ -330,7 +330,7 @@ export default function CompanionDetailPage() {
                 }}
               >
                 <Tab label="소개" />
-                <Tab label={`후기 (${companion.reviewsCount ?? 0})`} />
+                <Tab label={`후기 (${companion.reviews_count ?? 0})`} />
                 <Tab label="가능 시간" />
               </Tabs>
             </Paper>
@@ -371,9 +371,9 @@ export default function CompanionDetailPage() {
                   <Typography color="text.secondary" sx={{ fontSize: `${1 * scale}rem` }}>
                     후기 기능은 준비 중입니다.
                   </Typography>
-                  {companion.reviewsCount && companion.reviewsCount > 0 && (
+                  {companion.reviews_count && companion.reviews_count > 0 && (
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      총 {companion.reviewsCount}개의 후기가 있습니다.
+                      총 {companion.reviews_count}개의 후기가 있습니다.
                     </Typography>
                   )}
                 </Paper>

@@ -46,7 +46,14 @@ export {
 } from './constants';
 
 // 위치 관련
-export { getLocationByIP, getBrowserLocation, reverseGeocode } from './geolocation';
+export {
+  getLocationByIP,
+  getBrowserLocation,
+  reverseGeocode,
+  calculateDistance,
+  isWithinRadius,
+} from './geolocation';
+export type { Coordinates } from './geolocation';
 
 // Mock 데이터 (개발용)
 export * from './mockData';

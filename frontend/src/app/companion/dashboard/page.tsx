@@ -117,16 +117,16 @@ export default function CompanionDashboardPage() {
       // 예약 데이터를 대시보드용 형식으로 변환
       const dashboardReservations: DashboardReservation[] = reservationData.items.map((r: Reservation) => ({
         id: r.id,
-        customerName: r.userName || '고객',
-        customerPhone: r.userPhone || '',
-        date: r.scheduledDate,
-        time: r.scheduledTime,
-        estimatedHours: r.estimatedHours,
-        serviceType: r.serviceType,
-        hospital: r.hospitalName,
-        department: r.hospitalDepartment || '',
+        customerName: r.user_name || '고객',
+        customerPhone: r.user_phone || '',
+        date: r.scheduled_date,
+        time: r.scheduled_time,
+        estimatedHours: r.estimated_hours,
+        serviceType: r.service_type,
+        hospital: r.hospital_name,
+        department: r.hospital_department || '',
         status: r.status,
-        memo: r.specialRequests || '',
+        memo: r.special_requests || '',
       }));
 
       setReservations(dashboardReservations);
@@ -202,7 +202,7 @@ export default function CompanionDashboardPage() {
 
   // 실제 프로필 데이터 또는 기본값
   const stats = {
-    totalServices: managerProfile?.totalServices ?? 0,
+    totalServices: managerProfile?.total_services ?? 0,
     thisMonth: reservations.filter(r => r.status === 'confirmed' || r.status === 'completed').length,
     rating: managerProfile?.rating ?? 0,
     responseRate: 95, // TODO: 백엔드에서 계산 필요

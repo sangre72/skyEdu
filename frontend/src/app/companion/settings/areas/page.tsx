@@ -124,7 +124,7 @@ export default function ServiceAreasPage() {
       setIsLoading(true);
       setError(null);
       const profile = await api.getMyManagerProfile();
-      setSavedAreas(profile.availableAreas || []);
+      setSavedAreas(profile.available_areas || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : '지역 정보를 불러오는데 실패했습니다.');
     } finally {
@@ -141,7 +141,7 @@ export default function ServiceAreasPage() {
     try {
       setIsSaving(true);
       setError(null);
-      await api.updateMyManagerProfile({ availableAreas: areas });
+      await api.updateMyManagerProfile({ available_areas: areas });
       setSavedAreas(areas);
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);

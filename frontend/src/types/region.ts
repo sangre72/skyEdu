@@ -8,12 +8,16 @@ export interface Province {
   code: string;
   name: string;
   shortName: string;
+  lat?: number;
+  lng?: number;
 }
 
 // 시/군/구
 export interface District {
   code: string;
   name: string;
+  lat?: number;
+  lng?: number;
 }
 
 // 지역 데이터 전체 구조

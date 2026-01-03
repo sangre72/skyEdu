@@ -141,6 +141,9 @@ class ApiClient {
     page?: number;
     limit?: number;
     area?: string;
+    manager_type?: 'expert' | 'new' | 'volunteer';
+    certification?: string;
+    sort_by?: 'rating' | 'services' | 'reviews';
   }): Promise<ManagerListResponse> {
     const response = await this.client.get<ManagerListResponse>('/managers', { params });
     return response.data;
@@ -165,10 +168,10 @@ class ApiClient {
     const response = await this.client.patch<Manager>('/managers/me', {
       introduction: data.introduction,
       certifications: data.certifications,
-      available_areas: data.availableAreas,
-      profile_image: data.profileImage,
-      bank_name: data.bankName,
-      bank_account: data.bankAccount,
+      available_areas: data.available_areas,
+      profile_image: data.profile_image,
+      bank_name: data.bank_name,
+      bank_account: data.bank_account,
     });
     return response.data;
   }
@@ -203,18 +206,18 @@ class ApiClient {
   async createSchedule(data: ScheduleCreateRequest): Promise<ManagerSchedule> {
     const response = await this.client.post<ManagerSchedule>('/managers/me/schedules', {
       date: data.date,
-      start_time: data.startTime,
-      end_time: data.endTime,
-      is_available: data.isAvailable,
+      start_time: data.start_time,
+      end_time: data.end_time,
+      is_available: data.is_available,
     });
     return response.data;
   }
 
   async updateSchedule(scheduleId: string, data: ScheduleUpdateRequest): Promise<ManagerSchedule> {
     const response = await this.client.patch<ManagerSchedule>(`/managers/me/schedules/${scheduleId}`, {
-      start_time: data.startTime,
-      end_time: data.endTime,
-      is_available: data.isAvailable,
+      start_time: data.start_time,
+      end_time: data.end_time,
+      is_available: data.is_available,
     });
     return response.data;
   }
@@ -244,13 +247,13 @@ class ApiClient {
     const response = await this.client.post<Promotion>('/promotions/me', {
       name: data.name,
       description: data.description,
-      discount_type: data.discountType,
-      discount_value: data.discountValue,
-      target_type: data.targetType,
-      target_service_type: data.targetServiceType,
-      start_date: data.startDate,
-      end_date: data.endDate,
-      max_usage: data.maxUsage,
+      discount_type: data.discount_type,
+      discount_value: data.discount_value,
+      target_type: data.target_type,
+      target_service_type: data.target_service_type,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      max_usage: data.max_usage,
     });
     return response.data;
   }
@@ -259,13 +262,13 @@ class ApiClient {
     const response = await this.client.patch<Promotion>(`/promotions/me/${promotionId}`, {
       name: data.name,
       description: data.description,
-      discount_type: data.discountType,
-      discount_value: data.discountValue,
-      target_type: data.targetType,
-      target_service_type: data.targetServiceType,
-      start_date: data.startDate,
-      end_date: data.endDate,
-      max_usage: data.maxUsage,
+      discount_type: data.discount_type,
+      discount_value: data.discount_value,
+      target_type: data.target_type,
+      target_service_type: data.target_service_type,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      max_usage: data.max_usage,
     });
     return response.data;
   }

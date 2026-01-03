@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -19,6 +19,8 @@ import {
   Rating,
   Select,
   Skeleton,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 import {
@@ -31,18 +33,36 @@ import {
   LocalOffer,
   Article,
   NewReleases,
+  Star,
+  FiberNew,
+  Favorite,
+  NearMe,
 } from '@mui/icons-material';
+// Tab, Tabs 제거됨 - Chip 기반 UI로 변경
 
 import Header from '@/components/common/Header';
 import Footer from '@/components/common/Footer';
 import Breadcrumb from '@/components/common/Breadcrumb';
 import UISizeControl from '@/components/common/UISizeControl';
 import { CERTIFICATION_TYPES } from '@/lib/constants';
-import { getLocationByIP } from '@/lib/geolocation';
+import { getLocationByIP, getBrowserLocation, calculateDistance } from '@/lib/geolocation';
+import type { Coordinates } from '@/lib/geolocation';
 import { useLocationStore } from '@/stores/locationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useRegions } from '@/hooks/useRegions';
 import { useCompanions } from '@/hooks/useCompanions';
+
+// 매니저 유형 탭
+type ManagerTypeTab = 'expert' | 'new' | 'volunteer' | null;
+
+// 반경 옵션
+const RADIUS_OPTIONS = [
+  { value: 0, label: '전체' },
+  { value: 5, label: '5km' },
+  { value: 10, label: '10km' },
+  { value: 15, label: '15km' },
+  { value: 20, label: '20km' },
+];
 
 // Companion UI 타입 정의
 interface CompanionDiscount {
@@ -70,6 +90,8 @@ interface Companion {
   isNew: boolean;
   discount: CompanionDiscount | null;
   blogPostCount: number;
+  grade: 'new' | 'regular' | 'premium';
+  isVolunteer?: boolean; // 자원봉사 여부 (별도 필드 또는 자격증으로 판단)
 }
 
 // MOCK 데이터 (폴백용)
@@ -218,7 +240,13 @@ export default function CompanionsPage() {
   const [page, setPage] = useState(1);
   const [apiArea, setApiArea] = useState<string | undefined>(undefined);
 
-  // API 호출 (지역 필터 변경 시 area 파라미터 업데이트)
+  // 새로운 필터 상태
+  const [managerType, setManagerType] = useState<ManagerTypeTab>(null);
+  const [radiusKm, setRadiusKm] = useState<number>(0);
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  // API 호출 (지역/유형/자격증/정렬 필터 모두 서버에서 처리)
   const {
     companions: apiCompanions,
     total,
@@ -229,6 +257,9 @@ export default function CompanionsPage() {
     page,
     limit: 20,
     area: apiArea,
+    managerType: managerType,
+    certification: selectedCert || undefined,
+    sortBy: sortBy,
     autoFetch: true,
   });
 
@@ -290,6 +321,11 @@ export default function CompanionsPage() {
     setPage(1); // 필터 변경 시 첫 페이지로 이동
   }, [selectedProvince, selectedDistrict, showAllRegions]);
 
+  // 자격증/정렬/매니저유형 필터 변경 시 첫 페이지로 이동
+  useEffect(() => {
+    setPage(1);
+  }, [selectedCert, sortBy, managerType]);
+
   // 시/도 변경 시 시/군/구 초기화
   const handleProvinceChange = (province: string) => {
     setSelectedProvince(province);
@@ -335,6 +371,31 @@ export default function CompanionsPage() {
     }
   };
 
+  // 브라우저 GPS로 현재 위치 가져오기 (반경 검색용)
+  const handleGetCurrentLocation = async () => {
+    setIsGettingLocation(true);
+    try {
+      const position = await getBrowserLocation();
+      setUserLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+    } catch (error) {
+      console.error('위치 정보를 가져오는데 실패했습니다:', error);
+      alert('위치 정보를 가져올 수 없습니다. 위치 권한을 허용해주세요.');
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
+  // 반경 선택 시 위치 자동 가져오기
+  const handleRadiusChange = (newRadius: number) => {
+    setRadiusKm(newRadius);
+    if (newRadius > 0 && !userLocation) {
+      handleGetCurrentLocation();
+    }
+  };
+
   // 시/군/구 목록 (JSON에서 동적 로딩)
   const districts = useMemo(() => {
     return getDistrictsByProvince(selectedProvince);
@@ -351,48 +412,67 @@ export default function CompanionsPage() {
       id: manager.id,
       name: manager.name || '익명',
       introduction: manager.introduction || '',
-      serviceAreas: manager.availableAreas,
-      certifications: manager.certifications.map((cert) => ({
+      serviceAreas: manager.available_areas || [],
+      certifications: (manager.certifications || []).map((cert) => ({
         type: cert,
         name: CERTIFICATION_TYPES.find((c) => c.code === cert)?.name || cert,
         isVerified: manager.status === 'active', // 활성 매니저는 인증된 것으로 간주
       })),
-      rating: manager.rating,
-      totalServices: manager.totalServices,
+      rating: Number(manager.rating) || 0,
+      totalServices: manager.total_services || 0,
       reviewCount: 0, // TODO: 리뷰 API 연동 후 업데이트
       isAvailable: manager.status === 'active',
       isNew: manager.grade === 'new',
       discount: null, // TODO: 프로모션 API 연동 후 업데이트
       blogPostCount: 0, // TODO: 블로그 API 연동 후 업데이트
+      grade: manager.grade as 'new' | 'regular' | 'premium',
+      isVolunteer: manager.is_volunteer || false,
     }));
   }, [apiCompanions, companionsError]);
 
-  // 필터링 및 정렬 (클라이언트 측)
+  // 지역 좌표 가져오기 (반경 필터용)
+  const getAreaCoordinates = useCallback((areaCode: string): Coordinates | null => {
+    // 시/도 코드인지 시/군/구 코드인지 확인
+    const isDistrictCode = areaCode.includes('-');
+
+    if (isDistrictCode) {
+      // 시/군/구 코드에서 시/도 코드 추출
+      const provinceCode = areaCode.split('-')[0];
+      const districtList = getDistrictsByProvince(provinceCode);
+      const found = districtList.find((d) => d.code === areaCode);
+      if (found?.lat && found?.lng) {
+        return { lat: found.lat, lng: found.lng };
+      }
+    }
+
+    // 시/도에서 찾기
+    const province = provinces.find((p) => p.code === areaCode);
+    if (province?.lat && province?.lng) {
+      return { lat: province.lat, lng: province.lng };
+    }
+    return null;
+  }, [provinces, getDistrictsByProvince]);
+
+  // 필터링 (클라이언트 측 - 반경만, 나머지는 서버에서 처리)
+  // 지역, 자격증, 정렬, 매니저 유형은 모두 서버 측에서 처리
   const filteredCompanions = useMemo(() => {
     let result = [...transformedCompanions];
 
-    // 자격증 필터 (클라이언트 측에서만 적용)
-    if (selectedCert) {
-      result = result.filter((c) =>
-        c.certifications.some((cert) => cert.type === selectedCert)
-      );
-    }
-
-    // 정렬
-    switch (sortBy) {
-      case 'rating':
-        result.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'services':
-        result.sort((a, b) => b.totalServices - a.totalServices);
-        break;
-      case 'reviews':
-        result.sort((a, b) => b.reviewCount - a.reviewCount);
-        break;
+    // 반경 필터 (현재 위치 기준) - 클라이언트에서만 처리
+    if (radiusKm > 0 && userLocation) {
+      result = result.filter((companion) => {
+        // 동행인의 서비스 지역 중 하나라도 반경 내에 있으면 표시
+        return companion.serviceAreas.some((areaCode) => {
+          const areaCoords = getAreaCoordinates(areaCode);
+          if (!areaCoords) return false;
+          const distance = calculateDistance(userLocation, areaCoords);
+          return distance <= radiusKm;
+        });
+      });
     }
 
     return result;
-  }, [transformedCompanions, selectedCert, sortBy]);
+  }, [transformedCompanions, radiusKm, userLocation, getAreaCoordinates]);
 
   // 지역명 가져오기 (useRegions 훅에서 제공)
   const getAreaName = (code: string) => {
@@ -426,144 +506,213 @@ export default function CompanionsPage() {
           </Typography>
         </Box>
 
-        {/* 현재 위치 안내 */}
+        {/* 현재 위치 안내 + 반경 필터 */}
         <Paper
           sx={{
             p: 2,
             mb: 3,
             bgcolor: showAllRegions ? '#FFF8E1' : '#E3F2FD',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-            flexWrap: 'wrap',
           }}
         >
-          {showAllRegions ? (
-            <Public sx={{ color: '#F57C00' }} />
-          ) : (
-            <LocationOn sx={{ color: '#0288D1' }} />
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {showAllRegions ? (
+              <Public sx={{ color: '#F57C00' }} />
+            ) : (
+              <LocationOn sx={{ color: '#0288D1' }} />
+            )}
 
-          {isLocationLoading || isDetecting ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Skeleton width={150} height={24} />
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: `${0.9 * scale}rem` }}>
-                위치를 확인하고 있어요...
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <Typography sx={{ fontSize: `${1 * scale}rem` }}>
-                {showAllRegions ? (
-                  <><strong>전국</strong> 동행인을 보여드리고 있어요.</>
-                ) : (
-                  <>
-                    <strong>
-                      {getProvinceDisplayName(selectedProvince)}
-                      {selectedDistrict && ` ${districts.find(d => d.code === selectedDistrict)?.name || ''}`}
-                    </strong>
-                    {' '}지역의 동행인을 보여드리고 있어요.
-                  </>
+            {isLocationLoading || isDetecting ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Skeleton width={150} height={24} />
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: `${0.9 * scale}rem` }}>
+                  위치를 확인하고 있어요...
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Typography sx={{ fontSize: `${1 * scale}rem` }}>
+                  {showAllRegions ? (
+                    <><strong>전국</strong> 동행인을 보여드리고 있어요.</>
+                  ) : (
+                    <>
+                      <strong>
+                        {getProvinceDisplayName(selectedProvince)}
+                        {selectedDistrict && ` ${districts.find(d => d.code === selectedDistrict)?.name || ''}`}
+                      </strong>
+                      {' '}지역의 동행인을 보여드리고 있어요.
+                    </>
+                  )}
+                </Typography>
+                {!showAllRegions && savedProvince !== selectedProvince && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleSaveLocation}
+                    sx={{ fontSize: `${0.85 * scale}rem` }}
+                  >
+                    이 지역을 기본으로 설정
+                  </Button>
                 )}
-              </Typography>
-              {!showAllRegions && savedProvince !== selectedProvince && (
+              </>
+            )}
+
+            {/* 반경 필터 - 우측 */}
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <NearMe sx={{ fontSize: 18, color: 'text.secondary' }} />
+                <ToggleButtonGroup
+                  value={radiusKm}
+                  exclusive
+                  onChange={(_, value) => value !== null && handleRadiusChange(value)}
+                  size="small"
+                  sx={{
+                    '& .MuiToggleButton-root': {
+                      fontSize: `${0.75 * scale}rem`,
+                      px: 1,
+                      py: 0.5,
+                    },
+                  }}
+                >
+                  {RADIUS_OPTIONS.map((option) => (
+                    <ToggleButton key={option.value} value={option.value}>
+                      {option.label}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </Box>
+
+              {userLocation ? (
+                <Chip
+                  icon={<MyLocation sx={{ fontSize: 14 }} />}
+                  label="현재 위치"
+                  size="small"
+                  color="success"
+                  sx={{ fontSize: `${0.75 * scale}rem` }}
+                />
+              ) : (
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={handleSaveLocation}
-                  sx={{ fontSize: `${0.85 * scale}rem` }}
+                  startIcon={<MyLocation />}
+                  onClick={handleGetCurrentLocation}
+                  disabled={isGettingLocation}
+                  sx={{ fontSize: `${0.8 * scale}rem` }}
                 >
-                  이 지역을 기본으로 설정
+                  {isGettingLocation ? '확인 중...' : '현재 위치'}
                 </Button>
               )}
-            </>
-          )}
-
-          <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
-            {showAllRegions ? (
-              <Button
-                size="small"
-                variant="contained"
-                startIcon={<MyLocation />}
-                onClick={handleShowMyRegion}
-                sx={{ fontSize: `${0.85 * scale}rem` }}
-              >
-                내 지역 보기
-              </Button>
-            ) : (
-              <>
-                <Button
-                  size="small"
-                  startIcon={<Public />}
-                  onClick={handleShowAllRegions}
-                  sx={{ fontSize: `${0.85 * scale}rem` }}
-                >
-                  전국 보기
-                </Button>
-                <Button
-                  size="small"
-                  startIcon={<MyLocation />}
-                  onClick={handleDetectLocation}
-                  disabled={isDetecting}
-                  sx={{ fontSize: `${0.85 * scale}rem` }}
-                >
-                  {isDetecting ? '감지 중...' : '현재 위치로'}
-                </Button>
-              </>
-            )}
+            </Box>
           </Box>
         </Paper>
 
-        {/* 필터 */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, fontSize: `${1.1 * scale}rem` }}>
-            🔍 검색 조건
-          </Typography>
-          <Grid container spacing={2}>
-            {/* 시/도 선택 */}
-            <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth size="small" disabled={isRegionsLoading}>
-                <InputLabel sx={{ fontSize: `${0.9 * scale}rem` }}>시/도</InputLabel>
-                <Select
-                  value={selectedProvince}
-                  label="시/도"
-                  onChange={(e) => handleProvinceChange(e.target.value)}
-                  sx={{ fontSize: `${1 * scale}rem` }}
-                >
-                  <MenuItem value="" sx={{ fontSize: `${0.95 * scale}rem` }}>전국</MenuItem>
-                  {provinces.map((province) => (
-                    <MenuItem key={province.code} value={province.code} sx={{ fontSize: `${0.95 * scale}rem` }}>
-                      {province.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+        {/* 매니저 유형 필터 */}
+        <Paper sx={{ mb: 2, p: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 600, fontSize: `${0.9 * scale}rem`, mr: 1 }}
+            >
+              유형
+            </Typography>
+            <Chip
+              icon={<Star sx={{ fontSize: 16 }} />}
+              label="전문매니저"
+              size="small"
+              color={managerType === 'expert' ? 'warning' : 'default'}
+              variant={managerType === 'expert' ? 'filled' : 'outlined'}
+              onClick={() => setManagerType(managerType === 'expert' ? null : 'expert')}
+              sx={{ fontSize: `${0.85 * scale}rem`, fontWeight: 600 }}
+            />
+            <Chip
+              icon={<FiberNew sx={{ fontSize: 16 }} />}
+              label="신규매니저"
+              size="small"
+              color={managerType === 'new' ? 'error' : 'default'}
+              variant={managerType === 'new' ? 'filled' : 'outlined'}
+              onClick={() => setManagerType(managerType === 'new' ? null : 'new')}
+              sx={{ fontSize: `${0.85 * scale}rem`, fontWeight: 600 }}
+            />
+            <Chip
+              icon={<Favorite sx={{ fontSize: 16 }} />}
+              label="자원봉사"
+              size="small"
+              color={managerType === 'volunteer' ? 'secondary' : 'default'}
+              variant={managerType === 'volunteer' ? 'filled' : 'outlined'}
+              onClick={() => setManagerType(managerType === 'volunteer' ? null : 'volunteer')}
+              sx={{ fontSize: `${0.85 * scale}rem`, fontWeight: 600 }}
+            />
+          </Box>
+        </Paper>
 
-            {/* 시/군/구 선택 */}
-            <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth size="small" disabled={!selectedProvince || isRegionsLoading}>
-                <InputLabel sx={{ fontSize: `${0.9 * scale}rem` }}>시/군/구</InputLabel>
-                <Select
-                  value={selectedDistrict}
-                  label="시/군/구"
-                  onChange={(e) => setSelectedDistrict(e.target.value)}
-                  sx={{ fontSize: `${1 * scale}rem` }}
-                >
-                  <MenuItem value="" sx={{ fontSize: `${0.95 * scale}rem` }}>
-                    {selectedProvince ? '전체' : '시/도를 먼저 선택하세요'}
-                  </MenuItem>
-                  {districts.map((district) => (
-                    <MenuItem key={district.code} value={district.code} sx={{ fontSize: `${0.95 * scale}rem` }}>
-                      {district.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+        {/* 시/도 서브탭 */}
+        <Paper sx={{ mb: 2, p: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 600, fontSize: `${0.9 * scale}rem`, mr: 1 }}
+            >
+              지역
+            </Typography>
+            <Chip
+              label="전국"
+              size="small"
+              color={selectedProvince === '' ? 'primary' : 'default'}
+              variant={selectedProvince === '' ? 'filled' : 'outlined'}
+              onClick={() => handleProvinceChange('')}
+              sx={{ fontSize: `${0.8 * scale}rem` }}
+            />
+            {provinces.map((province) => (
+              <Chip
+                key={province.code}
+                label={province.shortName}
+                size="small"
+                color={selectedProvince === province.code ? 'primary' : 'default'}
+                variant={selectedProvince === province.code ? 'filled' : 'outlined'}
+                onClick={() => handleProvinceChange(province.code)}
+                sx={{ fontSize: `${0.8 * scale}rem` }}
+              />
+            ))}
+          </Box>
 
+          {/* 시/군/구 선택 (시/도 선택 시) */}
+          {selectedProvince && districts.length > 0 && (
+            <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid #E0E0E0' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 600, fontSize: `${0.85 * scale}rem`, mr: 1, color: 'text.secondary' }}
+                >
+                  상세
+                </Typography>
+                <Chip
+                  label="전체"
+                  size="small"
+                  color={selectedDistrict === '' ? 'secondary' : 'default'}
+                  variant={selectedDistrict === '' ? 'filled' : 'outlined'}
+                  onClick={() => setSelectedDistrict('')}
+                  sx={{ fontSize: `${0.75 * scale}rem` }}
+                />
+                {districts.map((district) => (
+                  <Chip
+                    key={district.code}
+                    label={district.name}
+                    size="small"
+                    color={selectedDistrict === district.code ? 'secondary' : 'default'}
+                    variant={selectedDistrict === district.code ? 'filled' : 'outlined'}
+                    onClick={() => setSelectedDistrict(district.code)}
+                    sx={{ fontSize: `${0.75 * scale}rem` }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Paper>
+
+        {/* 추가 필터: 자격증, 정렬 */}
+        <Paper sx={{ p: 2, mb: 4 }}>
+          <Grid container spacing={2} alignItems="center">
             {/* 자격증 필터 */}
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small">
                 <InputLabel sx={{ fontSize: `${0.9 * scale}rem` }}>자격증</InputLabel>
                 <Select
@@ -583,7 +732,7 @@ export default function CompanionsPage() {
             </Grid>
 
             {/* 정렬 */}
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small">
                 <InputLabel sx={{ fontSize: `${0.9 * scale}rem` }}>정렬</InputLabel>
                 <Select
@@ -885,8 +1034,12 @@ export default function CompanionsPage() {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <LocationOn sx={{ fontSize: 16, color: 'text.secondary' }} />
                             <Typography variant="caption" color="text.secondary" sx={{ fontSize: `${0.8 * scale}rem` }}>
-                              {companion.serviceAreas.slice(0, 2).map(getAreaName).join(', ')}
-                              {companion.serviceAreas.length > 2 && ` 외 ${companion.serviceAreas.length - 2}곳`}
+                              {companion.serviceAreas?.length > 0
+                                ? <>
+                                    {companion.serviceAreas.slice(0, 2).map(getAreaName).join(', ')}
+                                    {companion.serviceAreas.length > 2 && ` 외 ${companion.serviceAreas.length - 2}곳`}
+                                  </>
+                                : '지역 미설정'}
                             </Typography>
                           </Box>
 

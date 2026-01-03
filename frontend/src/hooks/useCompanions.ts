@@ -9,6 +9,9 @@ interface UseCompanionsParams {
   page?: number;
   limit?: number;
   area?: string;
+  managerType?: 'expert' | 'new' | 'volunteer' | null;
+  certification?: string;
+  sortBy?: 'rating' | 'services' | 'reviews';
   autoFetch?: boolean;
 }
 
@@ -16,7 +19,7 @@ interface UseCompanionsParams {
  * 동행인 목록 조회 훅
  */
 export function useCompanions(params: UseCompanionsParams = {}) {
-  const { page = 1, limit = 10, area, autoFetch = true } = params;
+  const { page = 1, limit = 10, area, managerType, certification, sortBy, autoFetch = true } = params;
 
   const [data, setData] = useState<ManagerListResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,14 +30,21 @@ export function useCompanions(params: UseCompanionsParams = {}) {
     setError(null);
 
     try {
-      const response = await api.getManagers({ page, limit, area });
+      const response = await api.getManagers({
+        page,
+        limit,
+        area,
+        manager_type: managerType || undefined,
+        certification: certification || undefined,
+        sort_by: sortBy || undefined,
+      });
       setData(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : '동행인 목록을 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit, area]);
+  }, [page, limit, area, managerType, certification, sortBy]);
 
   useEffect(() => {
     if (autoFetch) {

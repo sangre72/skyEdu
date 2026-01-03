@@ -9,40 +9,40 @@ export type ReservationStatus =
 
 export interface Reservation {
   id: string;
-  userId: string;
-  managerId?: string;
-  serviceType: ServiceType;
-  scheduledDate: string;
-  scheduledTime: string;
-  estimatedHours: number;
-  hospitalName: string;
-  hospitalAddress: string;
-  hospitalDepartment?: string;
-  pickupAddress?: string;
+  user_id: string;
+  manager_id?: string;
+  service_type: ServiceType;
+  scheduled_date: string;
+  scheduled_time: string;
+  estimated_hours: number;
+  hospital_name: string;
+  hospital_address: string;
+  hospital_department?: string;
+  pickup_address?: string;
   symptoms?: string;
-  specialRequests?: string;
+  special_requests?: string;
   status: ReservationStatus;
   price: number;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
   // 조회 시 추가 정보 (매니저가 조회할 때)
-  userName?: string;
-  userPhone?: string;
-  managerName?: string;
+  user_name?: string;
+  user_phone?: string;
+  manager_name?: string;
 }
 
 export interface CreateReservationRequest {
-  serviceType: ServiceType;
-  scheduledDate: string;
-  scheduledTime: string;
-  estimatedHours: number;
-  hospitalName: string;
-  hospitalAddress: string;
-  hospitalDepartment?: string;
-  pickupAddress?: string;
+  service_type: ServiceType;
+  scheduled_date: string;
+  scheduled_time: string;
+  estimated_hours: number;
+  hospital_name: string;
+  hospital_address: string;
+  hospital_department?: string;
+  pickup_address?: string;
   symptoms?: string;
-  specialRequests?: string;
-  managerId?: string;
+  special_requests?: string;
+  manager_id?: string;
 }
 
 export interface ReservationListResponse {

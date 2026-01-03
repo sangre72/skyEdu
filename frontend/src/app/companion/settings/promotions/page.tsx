@@ -115,14 +115,14 @@ export default function PromotionsSettingsPage() {
       setEditingPromotion(promotion);
       setFormData({
         name: promotion.name,
-        discountType: promotion.discountType,
-        discountValue: promotion.discountValue,
+        discountType: promotion.discount_type,
+        discountValue: promotion.discount_value,
         description: promotion.description || '',
-        targetType: promotion.targetType,
-        targetServiceType: promotion.targetServiceType || '',
-        startDate: promotion.startDate,
-        endDate: promotion.endDate,
-        maxUsage: promotion.maxUsage || 0,
+        targetType: promotion.target_type,
+        targetServiceType: promotion.target_service_type || '',
+        startDate: promotion.start_date,
+        endDate: promotion.end_date,
+        maxUsage: promotion.max_usage || 0,
       });
     } else {
       setEditingPromotion(null);
@@ -155,13 +155,13 @@ export default function PromotionsSettingsPage() {
       const requestData = {
         name: formData.name,
         description: formData.description || undefined,
-        discountType: formData.discountType,
-        discountValue: formData.discountValue,
-        targetType: formData.targetType,
-        targetServiceType: formData.targetType === 'specific_service' ? formData.targetServiceType : undefined,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        maxUsage: formData.maxUsage > 0 ? formData.maxUsage : undefined,
+        discount_type: formData.discountType,
+        discount_value: formData.discountValue,
+        target_type: formData.targetType,
+        target_service_type: formData.targetType === 'specific_service' ? formData.targetServiceType : undefined,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+        max_usage: formData.maxUsage > 0 ? formData.maxUsage : undefined,
       };
 
       if (editingPromotion) {
@@ -211,10 +211,10 @@ export default function PromotionsSettingsPage() {
   // 프로모션 상태
   const getPromotionStatus = (promotion: Promotion) => {
     const now = new Date();
-    const start = new Date(promotion.startDate);
-    const end = new Date(promotion.endDate);
+    const start = new Date(promotion.start_date);
+    const end = new Date(promotion.end_date);
 
-    if (!promotion.isActive) return { label: '비활성', color: 'default' as const };
+    if (!promotion.is_active) return { label: '비활성', color: 'default' as const };
     if (now < start) return { label: '예정', color: 'info' as const };
     if (now > end) return { label: '종료', color: 'default' as const };
     return { label: '진행중', color: 'success' as const };
@@ -314,25 +314,25 @@ export default function PromotionsSettingsPage() {
                 <Grid item xs={12} md={6} key={promotion.id}>
                   <Card
                     sx={{
-                      opacity: promotion.isActive ? 1 : 0.7,
-                      border: promotion.isActive ? '2px solid' : '1px solid',
-                      borderColor: promotion.isActive ? 'primary.main' : 'divider',
+                      opacity: promotion.is_active ? 1 : 0.7,
+                      border: promotion.is_active ? '2px solid' : '1px solid',
+                      borderColor: promotion.is_active ? 'primary.main' : 'divider',
                     }}
                   >
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {promotion.discountType === 'percent' ? (
+                          {promotion.discount_type === 'percent' ? (
                             <Chip
                               icon={<Percent sx={{ fontSize: 16 }} />}
-                              label={`${promotion.discountValue}% 할인`}
+                              label={`${promotion.discount_value}% 할인`}
                               color="primary"
                               sx={{ fontSize: `${0.9 * scale}rem`, fontWeight: 600 }}
                             />
                           ) : (
                             <Chip
                               icon={<LocalOffer sx={{ fontSize: 16 }} />}
-                              label={`${promotion.discountValue.toLocaleString()}원 할인`}
+                              label={`${promotion.discount_value.toLocaleString()}원 할인`}
                               color="secondary"
                               sx={{ fontSize: `${0.9 * scale}rem`, fontWeight: 600 }}
                             />
@@ -345,7 +345,7 @@ export default function PromotionsSettingsPage() {
                           />
                         </Box>
                         <Switch
-                          checked={promotion.isActive}
+                          checked={promotion.is_active}
                           onChange={() => handleToggleActive(promotion.id)}
                           size="small"
                         />
@@ -364,21 +364,21 @@ export default function PromotionsSettingsPage() {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Person sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: `${0.9 * scale}rem` }}>
-                            {TARGET_TYPES.find((t) => t.code === promotion.targetType)?.name}
-                            {promotion.targetServiceType && ` (${SERVICE_TYPES.find((s) => s.code === promotion.targetServiceType)?.name})`}
+                            {TARGET_TYPES.find((t) => t.code === promotion.target_type)?.name}
+                            {promotion.target_service_type && ` (${SERVICE_TYPES.find((s) => s.code === promotion.target_service_type)?.name})`}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Schedule sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: `${0.9 * scale}rem` }}>
-                            {formatDate(promotion.startDate)} ~ {formatDate(promotion.endDate)}
+                            {formatDate(promotion.start_date)} ~ {formatDate(promotion.end_date)}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Star sx={{ fontSize: 16, color: 'text.secondary' }} />
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: `${0.9 * scale}rem` }}>
-                            사용 횟수: {promotion.usedCount}회
-                            {promotion.maxUsage && promotion.maxUsage > 0 && ` / ${promotion.maxUsage}회`}
+                            사용 횟수: {promotion.used_count}회
+                            {promotion.max_usage && promotion.max_usage > 0 && ` / ${promotion.max_usage}회`}
                           </Typography>
                         </Box>
                       </Box>

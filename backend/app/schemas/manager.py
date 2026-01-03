@@ -13,6 +13,7 @@ class ManagerBase(BaseModel):
     introduction: Optional[str] = None
     certifications: list[str] = Field(default_factory=list)
     available_areas: list[str] = Field(default_factory=list)
+    is_volunteer: bool = False  # 자원봉사자 여부
 
 
 class ManagerCreate(ManagerBase):
@@ -30,6 +31,7 @@ class ManagerUpdate(BaseModel):
     profile_image: Optional[str] = None
     bank_name: Optional[str] = None
     bank_account: Optional[str] = None
+    is_volunteer: Optional[bool] = None
 
 
 class ManagerResponse(BaseModel):
@@ -45,6 +47,7 @@ class ManagerResponse(BaseModel):
     available_areas: list[str]
     introduction: Optional[str]
     profile_image: Optional[str]
+    is_volunteer: bool = False
     created_at: datetime
 
     # User 정보 포함

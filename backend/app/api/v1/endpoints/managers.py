@@ -38,6 +38,7 @@ def _build_manager_response(manager: Manager) -> ManagerResponse:
         available_areas=manager.available_areas or [],
         introduction=manager.introduction,
         profile_image=manager.profile_image,
+        is_volunteer=manager.is_volunteer,
         created_at=manager.created_at,
         name=manager.user.name if manager.user else None,
         phone=manager.user.phone if manager.user else None,
@@ -90,6 +91,9 @@ async def get_managers(
     limit: int = Query(10, ge=1, le=100),
     area: str | None = None,
     status_filter: str | None = Query(None, alias="status"),
+    manager_type: str | None = Query(None, description="매니저 유형: expert, new, volunteer"),
+    certification: str | None = Query(None, description="자격증 필터"),
+    sort_by: str | None = Query("rating", description="정렬 기준: rating, services, reviews"),
 ) -> ManagerListResponse:
     """매니저 목록 조회."""
     query = select(Manager).options(joinedload(Manager.user))
@@ -100,18 +104,44 @@ async def get_managers(
     elif status_filter:
         query = query.where(Manager.status == status_filter)
 
+    # 매니저 유형 필터
+    if manager_type == "expert":
+        # 전문매니저: 6건 이상 완료
+        query = query.where(Manager.total_services >= 6)
+    elif manager_type == "new":
+        # 신규매니저: 5건 이하
+        query = query.where(Manager.total_services <= 5)
+    elif manager_type == "volunteer":
+        # 자원봉사자
+        query = query.where(Manager.is_volunteer == True)  # noqa: E712
+
     # 지역 필터
     if area:
         query = query.where(Manager.available_areas.contains([area]))
+
+    # 자격증 필터
+    if certification:
+        query = query.where(Manager.certifications.contains([certification]))
 
     # 총 개수 조회
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
+    # 정렬
+    if sort_by == "services":
+        order_column = Manager.total_services.desc()
+    elif sort_by == "reviews":
+        # reviews 정렬은 리뷰 수 기준 - 현재 Manager에 reviews_count가 없으므로 rating 대체
+        # TODO: Manager 모델에 reviews_count 추가 후 수정
+        order_column = Manager.rating.desc()
+    else:
+        # 기본: rating
+        order_column = Manager.rating.desc()
+
     # 페이지네이션
     offset = (page - 1) * limit
-    query = query.order_by(Manager.rating.desc()).offset(offset).limit(limit)
+    query = query.order_by(order_column).offset(offset).limit(limit)
 
     result = await db.execute(query)
     managers = result.scalars().unique().all()

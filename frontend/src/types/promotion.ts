@@ -20,30 +20,30 @@ export interface Promotion {
   id: string;
   name: string;
   description?: string;
-  discountType: DiscountType;
-  discountValue: number; // percent: 0-100, fixed: 원 단위
-  targetType: DiscountTarget;
-  targetServiceType?: string; // specific_service인 경우
-  startDate: string;
-  endDate: string;
-  maxUsage?: number; // 최대 사용 횟수
-  usedCount: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  discount_type: DiscountType;
+  discount_value: number; // percent: 0-100, fixed: 원 단위
+  target_type: DiscountTarget;
+  target_service_type?: string; // specific_service인 경우
+  start_date: string;
+  end_date: string;
+  max_usage?: number; // 최대 사용 횟수
+  used_count: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // 프로모션 생성 요청
 export interface CreatePromotionRequest {
   name: string;
   description?: string;
-  discountType: DiscountType;
-  discountValue: number;
-  targetType: DiscountTarget;
-  targetServiceType?: string;
-  startDate: string;
-  endDate: string;
-  maxUsage?: number;
+  discount_type: DiscountType;
+  discount_value: number;
+  target_type: DiscountTarget;
+  target_service_type?: string;
+  start_date: string;
+  end_date: string;
+  max_usage?: number;
 }
 
 // 프로모션 라벨

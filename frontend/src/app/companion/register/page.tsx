@@ -146,7 +146,7 @@ export default function CompanionRegisterPage() {
       // 동행인 프로필 등록 API 호출
       const requestData: ManagerCreateRequest = {
         introduction,
-        availableAreas: selectedAreas,
+        available_areas: selectedAreas,
         certifications: selectedCerts,
       };
 

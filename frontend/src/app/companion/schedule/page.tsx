@@ -117,18 +117,18 @@ export default function CompanionSchedulePage() {
   // 스케줄 데이터를 CalendarEvent로 변환
   const convertScheduleToEvent = useCallback((schedule: ManagerSchedule): CalendarEvent => {
     const [year, month, day] = schedule.date.split('-').map(Number);
-    const [startHour, startMin] = schedule.startTime.split(':').map(Number);
-    const [endHour, endMin] = schedule.endTime.split(':').map(Number);
+    const [startHour, startMin] = schedule.start_time.split(':').map(Number);
+    const [endHour, endMin] = schedule.end_time.split(':').map(Number);
 
     const start = new Date(year, month - 1, day, startHour, startMin);
     const end = new Date(year, month - 1, day, endHour, endMin);
 
     return {
       id: `schedule-${schedule.id}`,
-      title: schedule.isAvailable ? '가능 시간' : '휴무',
+      title: schedule.is_available ? '가능 시간' : '휴무',
       start,
       end,
-      type: schedule.isAvailable ? 'available' : 'unavailable',
+      type: schedule.is_available ? 'available' : 'unavailable',
     };
   }, []);
 
@@ -241,9 +241,9 @@ export default function CompanionSchedulePage() {
               if (eventDate >= today) {
                 const schedule = await api.createSchedule({
                   date: format(eventDate, 'yyyy-MM-dd'),
-                  startTime: editStartTime,
-                  endTime: editEndTime,
-                  isAvailable: true,
+                  start_time: editStartTime,
+                  end_time: editEndTime,
+                  is_available: true,
                 });
                 createdSchedules.push(schedule);
               }
@@ -266,9 +266,9 @@ export default function CompanionSchedulePage() {
           // 단일 이벤트 생성
           const schedule = await api.createSchedule({
             date: format(editDate, 'yyyy-MM-dd'),
-            startTime: editStartTime,
-            endTime: editEndTime,
-            isAvailable: true,
+            start_time: editStartTime,
+            end_time: editEndTime,
+            is_available: true,
           });
 
           const newEvent = convertScheduleToEvent(schedule);
@@ -286,9 +286,9 @@ export default function CompanionSchedulePage() {
         const scheduleId = scheduleIdMap.get(selectedEvent.id);
         if (scheduleId) {
           const updatedSchedule = await api.updateSchedule(scheduleId, {
-            startTime: editStartTime,
-            endTime: editEndTime,
-            isAvailable: true,
+            start_time: editStartTime,
+            end_time: editEndTime,
+            is_available: true,
           });
 
           const updatedEvent = convertScheduleToEvent(updatedSchedule);

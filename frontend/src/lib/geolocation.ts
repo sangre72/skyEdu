@@ -4,6 +4,47 @@
 
 import { PROVINCES, DISTRICTS } from './constants';
 
+// 좌표 타입
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Haversine 공식을 이용한 두 지점 간 거리 계산 (km)
+ */
+export function calculateDistance(
+  point1: Coordinates,
+  point2: Coordinates
+): number {
+  const R = 6371; // 지구 반지름 (km)
+  const dLat = toRad(point2.lat - point1.lat);
+  const dLng = toRad(point2.lng - point1.lng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(point1.lat)) *
+      Math.cos(toRad(point2.lat)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRad(deg: number): number {
+  return deg * (Math.PI / 180);
+}
+
+/**
+ * 주어진 반경 내에 있는지 확인
+ */
+export function isWithinRadius(
+  center: Coordinates,
+  target: Coordinates,
+  radiusKm: number
+): boolean {
+  return calculateDistance(center, target) <= radiusKm;
+}
+
 // IP 기반 위치 정보 타입
 export interface GeoLocation {
   province: string; // 시/도 코드

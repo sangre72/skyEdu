@@ -4,30 +4,31 @@ export type ManagerGrade = 'new' | 'regular' | 'premium';
 
 export interface Manager {
   id: string;
-  userId: string;
+  user_id: string;
   name?: string;
   phone?: string;
-  profileImage?: string;
+  profile_image?: string;
   status: ManagerStatus;
   grade: ManagerGrade;
   rating: number;
-  totalServices: number;
+  total_services: number;
   certifications: string[];
-  availableAreas: string[];
+  available_areas: string[];
   introduction?: string;
-  createdAt: string;
+  is_volunteer: boolean; // 자원봉사자 여부 (봉사료 0원)
+  created_at: string;
   // 상세 조회 시 추가 정보
-  reviewsCount?: number;
-  avgRating?: number;
+  reviews_count?: number;
+  avg_rating?: number;
 }
 
 export interface ManagerSchedule {
   id: string;
-  managerId: string;
+  manager_id: string;
   date: string;
-  startTime: string;
-  endTime: string;
-  isAvailable: boolean;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
 }
 
 export interface ManagerListResponse {
@@ -53,32 +54,34 @@ export const MANAGER_GRADE_LABELS: Record<ManagerGrade, string> = {
 export interface ManagerCreateRequest {
   introduction: string;
   certifications: string[];
-  availableAreas: string[];
+  available_areas: string[];
+  is_volunteer?: boolean;
 }
 
 export interface ScheduleCreateRequest {
   date: string;
-  startTime: string;
-  endTime: string;
-  isAvailable: boolean;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
 }
 
 export interface ScheduleUpdateRequest {
-  startTime?: string;
-  endTime?: string;
-  isAvailable?: boolean;
+  start_time?: string;
+  end_time?: string;
+  is_available?: boolean;
 }
 
 export interface ManagerUpdateRequest {
   introduction?: string;
   certifications?: string[];
-  availableAreas?: string[];
-  profileImage?: string;
-  bankName?: string;
-  bankAccount?: string;
+  available_areas?: string[];
+  profile_image?: string;
+  bank_name?: string;
+  bank_account?: string;
+  is_volunteer?: boolean;
 }
 
 export interface ManagerDetail extends Manager {
-  reviewsCount: number;
-  avgRating: number;
+  reviews_count: number;
+  avg_rating: number;
 }

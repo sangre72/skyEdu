@@ -72,6 +72,7 @@ class Manager(Base, TimestampMixin):
     profile_image: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     bank_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     bank_account: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_volunteer: Mapped[bool] = mapped_column(Boolean, default=False)  # 자원봉사자 여부 (봉사료 0원)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="manager_profile")
