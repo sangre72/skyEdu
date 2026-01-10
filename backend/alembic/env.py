@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.db.base import Base
 
 # 모든 모델 import (autogenerate를 위해 필요)
-from app.models import Manager, ManagerSchedule, Payment, Promotion, Reservation, Review, User, UserProfile  # noqa: F401
+from app.models import Manager, ManagerSchedule, Payment, Promotion, Reservation, Review, User, UserGroup, UserProfile  # noqa: F401
 
 # Alembic Config 객체
 config = context.config

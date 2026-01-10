@@ -5,11 +5,23 @@ export interface User {
   id: string;
   phone: string;
   name: string;
+  email?: string;
   role: UserRole;
   is_verified: boolean;
   is_active: boolean;
+  group_id?: string;
+  group?: UserGroup;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface UserGroup {
+  id: string;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // 동행인 프로필

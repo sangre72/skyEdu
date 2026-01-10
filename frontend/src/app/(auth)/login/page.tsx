@@ -19,12 +19,13 @@ import Footer from '@/components/common/Footer';
 import Breadcrumb from '@/components/common/Breadcrumb';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { useAuthRedirect } from '@/hooks';
+import { useAuthRedirect, useMaintenanceMode } from '@/hooks';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuthStore();
   const { isRedirecting } = useAuthRedirect();
+  const isMaintenanceMode = useMaintenanceMode();
 
   const [step, setStep] = useState<'phone' | 'verify'>('phone');
   const [phone, setPhone] = useState('');
@@ -129,6 +130,12 @@ export default function LoginPage() {
               휴대폰 번호로 간편하게 로그인하세요
             </Typography>
 
+            {isMaintenanceMode && (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                현재 시스템 점검 중입니다. 잠시 후 다시 시도해주세요.
+              </Alert>
+            )}
+
             {error && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 {error}
@@ -151,7 +158,7 @@ export default function LoginPage() {
                   variant="contained"
                   size="large"
                   onClick={handleSendCode}
-                  disabled={isLoading || phone.replace(/-/g, '').length !== 11}
+                  disabled={isLoading || phone.replace(/-/g, '').length !== 11 || isMaintenanceMode}
                 >
                   {isLoading ? '발송 중...' : '인증번호 받기'}
                 </Button>
@@ -184,7 +191,7 @@ export default function LoginPage() {
                   variant="contained"
                   size="large"
                   onClick={handleVerifyCode}
-                  disabled={isLoading || code.length !== 6}
+                  disabled={isLoading || code.length !== 6 || isMaintenanceMode}
                   sx={{ mb: 2 }}
                 >
                   {isLoading ? '확인 중...' : '로그인'}

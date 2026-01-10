@@ -30,47 +30,43 @@ class BoardApiClient {
   // ============ 게시판 ============
 
   async getBoards(): Promise<BoardListResponse> {
-    const response = await api['client'].get<BoardListResponse>('/boards');
-    return response.data;
+    return api.get<BoardListResponse>('/boards');
   }
 
   async getBoard(code: string): Promise<Board> {
-    const response = await api['client'].get<Board>(`/boards/${code}`);
-    return response.data;
+    return api.get<Board>(`/boards/${code}`);
   }
 
   async createBoard(data: BoardCreateRequest): Promise<Board> {
-    const response = await api['client'].post<Board>('/boards', data);
-    return response.data;
+    return api.post<Board>('/boards', data);
   }
 
   async updateBoard(code: string, data: BoardUpdateRequest): Promise<Board> {
-    const response = await api['client'].patch<Board>(`/boards/${code}`, data);
-    return response.data;
+    return api.patch<Board>(`/boards/${code}`, data);
   }
 
   async deleteBoard(code: string): Promise<void> {
-    await api['client'].delete(`/boards/${code}`);
+    await api.delete(`/boards/${code}`);
   }
 
   // ============ 게시판 분류 ============
 
   async getCategories(boardCode: string): Promise<BoardCategoryListResponse> {
-    const response = await api['client'].get<BoardCategoryListResponse>(
+    const response = await api.get<BoardCategoryListResponse>(
       `/boards/${boardCode}/categories`
     );
-    return response.data;
+    return response;
   }
 
   async createCategory(
     boardCode: string,
     data: BoardCategoryCreateRequest
   ): Promise<BoardCategory> {
-    const response = await api['client'].post<BoardCategory>(
+    const response = await api.post<BoardCategory>(
       `/boards/${boardCode}/categories`,
       data
     );
-    return response.data;
+    return response;
   }
 
   async updateCategory(
@@ -78,92 +74,92 @@ class BoardApiClient {
     categoryId: string,
     data: BoardCategoryUpdateRequest
   ): Promise<BoardCategory> {
-    const response = await api['client'].patch<BoardCategory>(
+    const response = await api.patch<BoardCategory>(
       `/boards/${boardCode}/categories/${categoryId}`,
       data
     );
-    return response.data;
+    return response;
   }
 
   async deleteCategory(boardCode: string, categoryId: string): Promise<void> {
-    await api['client'].delete(`/boards/${boardCode}/categories/${categoryId}`);
+    await api.delete(`/boards/${boardCode}/categories/${categoryId}`);
   }
 
   // ============ 게시글 ============
 
   async getPosts(boardCode: string, params?: PostListParams): Promise<PostListResponse> {
-    const response = await api['client'].get<PostListResponse>(`/boards/${boardCode}/posts`, {
+    const response = await api.get<PostListResponse>(`/boards/${boardCode}/posts`, {
       params,
     });
-    return response.data;
+    return response;
   }
 
   async getPost(boardCode: string, postId: string, password?: string): Promise<PostDetailResponse> {
-    const response = await api['client'].get<PostDetailResponse>(
+    const response = await api.get<PostDetailResponse>(
       `/boards/${boardCode}/posts/${postId}`,
       {
         params: password ? { password } : undefined,
       }
     );
-    return response.data;
+    return response;
   }
 
   async createPost(boardCode: string, data: PostCreateRequest): Promise<Post> {
-    const response = await api['client'].post<Post>(`/boards/${boardCode}/posts`, data);
-    return response.data;
+    const response = await api.post<Post>(`/boards/${boardCode}/posts`, data);
+    return response;
   }
 
   async updatePost(boardCode: string, postId: string, data: PostUpdateRequest): Promise<Post> {
-    const response = await api['client'].patch<Post>(
+    const response = await api.patch<Post>(
       `/boards/${boardCode}/posts/${postId}`,
       data
     );
-    return response.data;
+    return response;
   }
 
   async deletePost(boardCode: string, postId: string): Promise<void> {
-    await api['client'].delete(`/boards/${boardCode}/posts/${postId}`);
+    await api.delete(`/boards/${boardCode}/posts/${postId}`);
   }
 
   async likePost(postId: string): Promise<LikeResponse> {
-    const response = await api['client'].post<LikeResponse>(`/posts/${postId}/like`);
-    return response.data;
+    const response = await api.post<LikeResponse>(`/posts/${postId}/like`);
+    return response;
   }
 
   async unlikePost(postId: string): Promise<LikeResponse> {
-    const response = await api['client'].delete<LikeResponse>(`/posts/${postId}/like`);
-    return response.data;
+    const response = await api.delete<LikeResponse>(`/posts/${postId}/like`);
+    return response;
   }
 
   // ============ 댓글 ============
 
   async getComments(postId: string): Promise<CommentListResponse> {
-    const response = await api['client'].get<CommentListResponse>(`/posts/${postId}/comments`);
-    return response.data;
+    const response = await api.get<CommentListResponse>(`/posts/${postId}/comments`);
+    return response;
   }
 
   async createComment(postId: string, data: CommentCreateRequest): Promise<Comment> {
-    const response = await api['client'].post<Comment>(`/posts/${postId}/comments`, data);
-    return response.data;
+    const response = await api.post<Comment>(`/posts/${postId}/comments`, data);
+    return response;
   }
 
   async updateComment(commentId: string, data: CommentUpdateRequest): Promise<Comment> {
-    const response = await api['client'].patch<Comment>(`/comments/${commentId}`, data);
-    return response.data;
+    const response = await api.patch<Comment>(`/comments/${commentId}`, data);
+    return response;
   }
 
   async deleteComment(commentId: string): Promise<void> {
-    await api['client'].delete(`/comments/${commentId}`);
+    await api.delete(`/comments/${commentId}`);
   }
 
   async likeComment(commentId: string): Promise<LikeResponse> {
-    const response = await api['client'].post<LikeResponse>(`/comments/${commentId}/like`);
-    return response.data;
+    const response = await api.post<LikeResponse>(`/comments/${commentId}/like`);
+    return response;
   }
 
   async unlikeComment(commentId: string): Promise<LikeResponse> {
-    const response = await api['client'].delete<LikeResponse>(`/comments/${commentId}/like`);
-    return response.data;
+    const response = await api.delete<LikeResponse>(`/comments/${commentId}/like`);
+    return response;
   }
 
   // ============ 첨부파일 ============
@@ -172,7 +168,7 @@ class BoardApiClient {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api['client'].post<AttachmentUploadResponse>(
+    const response = await api.post<AttachmentUploadResponse>(
       '/attachments/upload',
       formData,
       {
@@ -181,15 +177,15 @@ class BoardApiClient {
         },
       }
     );
-    return response.data;
+    return response;
   }
 
   async deleteAttachment(attachmentId: string): Promise<void> {
-    await api['client'].delete(`/attachments/${attachmentId}`);
+    await api.delete(`/attachments/${attachmentId}`);
   }
 
   getAttachmentDownloadUrl(attachmentId: string): string {
-    const baseUrl = api['client'].defaults.baseURL || '';
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
     return `${baseUrl}/attachments/${attachmentId}/download`;
   }
 }

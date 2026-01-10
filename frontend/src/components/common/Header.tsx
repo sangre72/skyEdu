@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Close, Menu, Phone } from '@mui/icons-material';
+import { Close, Menu as MenuIcon, Phone } from '@mui/icons-material';
+import * as MuiIcons from '@mui/icons-material';
 import {
   Box,
   Button,
@@ -21,25 +22,16 @@ import {
 
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useMainMenus, useHeaderUtilityMenus } from '@/hooks';
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext';
+import type { Menu } from '@/types/menu';
 
-interface NavItem {
-  label: string;
-  path: string;
-  roles?: ('customer' | 'companion' | 'admin')[];
-  authRequired?: boolean;
-  guestOnly?: boolean;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { label: '동행인 찾기', path: '/companions' },
-  { label: '예약하기', path: '/reservation/new' },
-  { label: '공지사항', path: '/boards/notice' },
-  { label: 'FAQ', path: '/boards/faq' },
-  { label: '동행인 등록', path: '/companion/register', guestOnly: true },
-  { label: '스케줄 관리', path: '/companion/schedule', roles: ['companion'], authRequired: true },
-  { label: '대시보드', path: '/companion/dashboard', roles: ['companion'], authRequired: true },
-  { label: '내 예약', path: '/mypage/reservations', roles: ['customer'], authRequired: true },
-];
+// MUI 아이콘 동적 로딩 헬퍼
+const getIcon = (iconName: string | null | undefined) => {
+  if (!iconName) return null;
+  const Icon = (MuiIcons as any)[iconName];
+  return Icon ? <Icon sx={{ fontSize: 20 }} /> : null;
+};
 
 export default function Header() {
   const router = useRouter();
@@ -49,6 +41,16 @@ export default function Header() {
 
   const { user, isAuthenticated, logout } = useAuthStore();
   const { openLoginModal } = useUIStore();
+  const { isFeatureEnabled } = useFeatureFlags();
+
+  // 메뉴 데이터 로드
+  const { menus: mainMenus, isLoading: mainMenusLoading } = useMainMenus('user');
+  const { menus: utilityMenus, isLoading: utilityMenusLoading } = useHeaderUtilityMenus();
+
+  // 홈 메뉴 찾기 (menu_code가 'home', 'Home', 'HOME' 중 하나)
+  const homeMenu = mainMenus.find((menu) =>
+    menu.depth === 0 && ['home', 'Home', 'HOME'].includes(menu.menu_code)
+  );
 
   const handleLogout = () => {
     logout();
@@ -60,27 +62,63 @@ export default function Header() {
     setMobileMenuOpen(false);
   };
 
-  const getVisibleNavItems = () => {
-    return NAV_ITEMS.filter((item) => {
-      // 게스트 전용 메뉴
-      if (item.guestOnly && isAuthenticated) return false;
+  const handleUtilityMenuClick = (menu: Menu) => {
+    if (menu.link_type === 'none') {
+      // 로그아웃과 같은 액션
+      if (menu.menu_code === 'logout') {
+        handleLogout();
+      }
+    } else if (menu.link_url) {
+      if (menu.link_type === 'new_window') {
+        window.open(menu.link_url, '_blank');
+      } else {
+        handleNavClick(menu.link_url);
+      }
+    }
+  };
 
-      // 로그인 필요 메뉴
-      if (item.authRequired && !isAuthenticated) return false;
-
-      // 역할 기반 필터
-      if (item.roles && user) {
-        return item.roles.includes(user.role);
+  // 권한 및 기능 플래그에 따라 메뉴 필터링
+  const getVisibleMenus = (menus: Menu[]) => {
+    return menus.filter((menu) => {
+      // is_visible 체크: 숨김 처리된 메뉴는 표시하지 않음
+      if (!menu.is_visible) {
+        return false;
       }
 
-      // 역할 지정 없으면 모두에게 표시
-      if (!item.roles) return true;
+      // Feature Flag 체크: feature_key가 있으면 해당 기능이 활성화되어 있어야 함
+      if (menu.feature_key) {
+        if (!isFeatureEnabled(menu.feature_key)) {
+          return false; // 기능이 비활성화되어 있으면 메뉴 숨김
+        }
+      }
 
-      return false;
+      // 권한 타입에 따른 필터링
+      switch (menu.permission_type) {
+        case 'public':
+          return true;
+        case 'member':
+          return isAuthenticated;
+        case 'admin':
+          return user?.role === 'admin';
+        case 'roles':
+          // role 기반 필터링 (추가 구현 필요 시)
+          return isAuthenticated;
+        default:
+          return true;
+      }
     });
   };
 
-  const visibleNavItems = getVisibleNavItems();
+  // 홈 메뉴를 제외한 메뉴만 표시
+  const visibleMainMenus = getVisibleMenus(mainMenus).filter(
+    (menu) => !['home', 'Home', 'HOME'].includes(menu.menu_code)
+  );
+  const visibleUtilityMenus = getVisibleMenus(utilityMenus);
+
+  // 로그인/로그아웃 메뉴 분리
+  const authMenus = visibleUtilityMenus.filter((menu) =>
+    ['login', 'register', 'logout', 'mypage_icon'].includes(menu.menu_code)
+  );
 
   return (
     <Box
@@ -99,7 +137,10 @@ export default function Header() {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {/* 로고 */}
           <Box
-            onClick={() => router.push('/')}
+            onClick={() => {
+              const targetPath = homeMenu?.link_url || '/';
+              router.push(targetPath);
+            }}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -183,12 +224,13 @@ export default function Header() {
           </Box>
 
           {/* 데스크톱 네비게이션 */}
-          {!isMobile && (
+          {!isMobile && !mainMenusLoading && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {visibleNavItems.map((item) => (
+              {visibleMainMenus.map((menu) => (
                 <Button
-                  key={item.path}
-                  onClick={() => handleNavClick(item.path)}
+                  key={menu.id}
+                  onClick={() => menu.link_url && handleNavClick(menu.link_url)}
+                  startIcon={getIcon(menu.icon)}
                   sx={{
                     color: '#1A1A2E',
                     fontWeight: 500,
@@ -202,7 +244,7 @@ export default function Header() {
                     },
                   }}
                 >
-                  {item.label}
+                  {menu.menu_name}
                 </Button>
               ))}
             </Box>
@@ -229,72 +271,82 @@ export default function Header() {
             </Box>
 
             {/* 인증 버튼 */}
-            {isAuthenticated ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box
-                  sx={{
-                    display: { xs: 'none', sm: 'flex' },
-                    alignItems: 'center',
-                    gap: 1,
-                    px: 2,
-                    py: 0.5,
-                    bgcolor: '#E3F2FD',
-                    borderRadius: 2,
-                  }}
-                >
-                  <Typography variant="body2" fontWeight={600} color="#0288D1">
-                    {user?.name}님
-                  </Typography>
-                </Box>
-                <Button
-                  size="small"
-                  onClick={() => router.push('/mypage')}
-                  sx={{
-                    display: { xs: 'none', md: 'inline-flex' },
-                    color: '#5A6A7A',
-                    '&:hover': { color: '#0288D1' },
-                  }}
-                >
-                  마이페이지
-                </Button>
-                <Button
-                  size="small"
-                  onClick={handleLogout}
-                  sx={{
-                    display: { xs: 'none', md: 'inline-flex' },
-                    color: '#94A3B8',
-                    '&:hover': { color: '#E53935' },
-                  }}
-                >
-                  로그아웃
-                </Button>
-              </Box>
-            ) : (
-              <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1 }}>
-                <Button
-                  size="small"
-                  onClick={openLoginModal}
-                  sx={{
-                    color: '#5A6A7A',
-                    fontWeight: 500,
-                    '&:hover': { color: '#0288D1' },
-                  }}
-                >
-                  로그인
-                </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={() => router.push('/register')}
-                  sx={{
-                    borderRadius: 2,
-                    px: 2.5,
-                    boxShadow: '0 2px 8px rgba(2, 136, 209, 0.3)',
-                  }}
-                >
-                  회원가입
-                </Button>
-              </Box>
+            {!utilityMenusLoading && (
+              <>
+                {isAuthenticated ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        display: { xs: 'none', sm: 'flex' },
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 2,
+                        py: 0.5,
+                        bgcolor: '#E3F2FD',
+                        borderRadius: 2,
+                      }}
+                    >
+                      <Typography variant="body2" fontWeight={600} color="#0288D1">
+                        {user?.name}님
+                      </Typography>
+                    </Box>
+                    {authMenus
+                      .filter((menu) => menu.permission_type === 'member')
+                      .map((menu) => (
+                        <Button
+                          key={menu.id}
+                          size="small"
+                          onClick={() => handleUtilityMenuClick(menu)}
+                          startIcon={getIcon(menu.icon)}
+                          sx={{
+                            display: { xs: 'none', md: 'inline-flex' },
+                            color: menu.menu_code === 'logout' ? '#94A3B8' : '#5A6A7A',
+                            '&:hover': {
+                              color: menu.menu_code === 'logout' ? '#E53935' : '#0288D1',
+                            },
+                          }}
+                        >
+                          {menu.menu_name}
+                        </Button>
+                      ))}
+                  </Box>
+                ) : (
+                  <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1 }}>
+                    {authMenus
+                      .filter((menu) => menu.permission_type === 'public')
+                      .map((menu) => (
+                        <Button
+                          key={menu.id}
+                          size="small"
+                          variant={menu.menu_code === 'register' ? 'contained' : 'text'}
+                          onClick={() => {
+                            if (menu.menu_code === 'login') {
+                              openLoginModal();
+                            } else if (menu.link_url) {
+                              handleNavClick(menu.link_url);
+                            }
+                          }}
+                          startIcon={getIcon(menu.icon)}
+                          sx={{
+                            ...(menu.menu_code === 'register'
+                              ? {
+                                  borderRadius: 2,
+                                  px: 2.5,
+                                  boxShadow: '0 2px 8px rgba(2, 136, 209, 0.3)',
+                                }
+                              : {
+                                  color: '#5A6A7A',
+                                  fontWeight: 500,
+                                  '&:hover': { color: '#0288D1' },
+                                }),
+                          }}
+                        >
+                          {menu.menu_name}
+                        </Button>
+                      ))}
+                  </Box>
+                )}
+              </>
             )}
 
             {/* 모바일 메뉴 버튼 */}
@@ -306,7 +358,7 @@ export default function Header() {
                   '&:hover': { bgcolor: '#E3F2FD' },
                 }}
               >
-                <Menu sx={{ color: '#0288D1' }} />
+                <MenuIcon sx={{ color: '#0288D1' }} />
               </IconButton>
             )}
           </Box>
@@ -314,11 +366,7 @@ export default function Header() {
       </Container>
 
       {/* 모바일 드로어 메뉴 */}
-      <Drawer
-        anchor="right"
-        open={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
-      >
+      <Drawer anchor="right" open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)}>
         <Box sx={{ width: 280, p: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" fontWeight={700} color="primary.main">
@@ -334,9 +382,7 @@ export default function Header() {
               <Typography variant="body2" color="text.secondary">
                 안녕하세요,
               </Typography>
-              <Typography fontWeight={600}>
-                {user?.name}님
-              </Typography>
+              <Typography fontWeight={600}>{user?.name}님</Typography>
               <Typography variant="caption" color="text.secondary">
                 {user?.role === 'companion' ? '동행인' : '고객'}
               </Typography>
@@ -344,59 +390,63 @@ export default function Header() {
           )}
 
           <List>
-            {visibleNavItems.map((item) => (
-              <ListItem key={item.path} disablePadding>
-                <ListItemButton onClick={() => handleNavClick(item.path)}>
-                  <ListItemText primary={item.label} />
-                </ListItemButton>
-              </ListItem>
-            ))}
+            {/* 메인 메뉴 */}
+            {!mainMenusLoading &&
+              visibleMainMenus.map((menu) => (
+                <ListItem key={menu.id} disablePadding>
+                  <ListItemButton onClick={() => menu.link_url && handleNavClick(menu.link_url)}>
+                    {getIcon(menu.icon) && (
+                      <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
+                        {getIcon(menu.icon)}
+                      </Box>
+                    )}
+                    <ListItemText primary={menu.menu_name} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
 
-            {isAuthenticated ? (
-              <>
-                <ListItem disablePadding>
-                  <ListItemButton onClick={() => handleNavClick('/mypage')}>
-                    <ListItemText primary="마이페이지" />
-                  </ListItemButton>
-                </ListItem>
-                <ListItem disablePadding>
-                  <ListItemButton
-                    onClick={() => {
-                      handleLogout();
-                      setMobileMenuOpen(false);
-                    }}
-                  >
-                    <ListItemText primary="로그아웃" sx={{ color: 'error.main' }} />
-                  </ListItemButton>
-                </ListItem>
-              </>
-            ) : (
-              <>
-                <ListItem disablePadding>
-                  <ListItemButton
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      openLoginModal();
-                    }}
-                  >
-                    <ListItemText primary="로그인" />
-                  </ListItemButton>
-                </ListItem>
-                <ListItem disablePadding>
-                  <ListItemButton
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push('/register');
-                    }}
-                  >
-                    <ListItemText
-                      primary="회원가입"
-                      primaryTypographyProps={{ color: 'primary.main', fontWeight: 600 }}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              </>
-            )}
+            {/* 유틸리티 메뉴 */}
+            {!utilityMenusLoading &&
+              authMenus.map((menu) => {
+                // 권한에 따라 필터링
+                if (
+                  (menu.permission_type === 'public' && isAuthenticated) ||
+                  (menu.permission_type === 'member' && !isAuthenticated)
+                ) {
+                  return null;
+                }
+
+                return (
+                  <ListItem key={menu.id} disablePadding>
+                    <ListItemButton
+                      onClick={() => {
+                        if (menu.menu_code === 'login') {
+                          setMobileMenuOpen(false);
+                          openLoginModal();
+                        } else {
+                          handleUtilityMenuClick(menu);
+                        }
+                      }}
+                    >
+                      {getIcon(menu.icon) && (
+                        <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
+                          {getIcon(menu.icon)}
+                        </Box>
+                      )}
+                      <ListItemText
+                        primary={menu.menu_name}
+                        primaryTypographyProps={{
+                          ...(menu.menu_code === 'register' && {
+                            color: 'primary.main',
+                            fontWeight: 600,
+                          }),
+                          ...(menu.menu_code === 'logout' && { color: 'error.main' }),
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              })}
           </List>
 
           <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #E5E5E5' }}>

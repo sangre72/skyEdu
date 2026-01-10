@@ -16,6 +16,7 @@ from app.schemas.user import (
     UserResponse,
     UserUpdate,
     UserWithProfileResponse,
+    UserGroupAssign,
 )
 
 router = APIRouter()
@@ -169,7 +170,9 @@ async def get_user(
     db: DbSession,
 ) -> UserResponse:
     """특정 사용자 정보 조회 (관리자 전용)."""
-    result = await db.execute(select(User).where(User.id == UUID(user_id)))
+    result = await db.execute(
+        select(User).options(selectinload(User.group)).where(User.id == UUID(user_id))
+    )
     user = result.scalar_one_or_none()
 
     if not user:
@@ -191,7 +194,7 @@ async def get_users(
     is_active: bool | None = None,
 ) -> list[UserResponse]:
     """사용자 목록 조회 (관리자 전용)."""
-    query = select(User)
+    query = select(User).options(selectinload(User.group))
 
     if role:
         query = query.where(User.role == role)
@@ -254,6 +257,37 @@ async def activate_user(
     user.is_active = True
     await db.flush()
     await db.refresh(user)
+
+    return UserResponse.model_validate(user)
+
+
+@router.patch("/{user_id}/group", response_model=UserResponse)
+async def assign_user_group(
+    user_id: str,
+    data: UserGroupAssign,
+    current_user: CurrentAdmin,
+    db: DbSession,
+) -> UserResponse:
+    """사용자 그룹 할당 (관리자 전용)."""
+    result = await db.execute(
+        select(User).options(selectinload(User.group)).where(User.id == UUID(user_id))
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="사용자를 찾을 수 없습니다.",
+        )
+
+    user.group_id = data.group_id
+    await db.flush()
+
+    # Reload with group relationship
+    result = await db.execute(
+        select(User).options(selectinload(User.group)).where(User.id == UUID(user_id))
+    )
+    user = result.scalar_one()
 
     return UserResponse.model_validate(user)
 

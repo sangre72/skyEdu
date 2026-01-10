@@ -79,7 +79,7 @@ async def get_reservations(
     # 역할에 따른 필터링
     if current_user.role == UserRole.CUSTOMER.value:
         query = query.where(Reservation.user_id == current_user.id)
-    elif current_user.role == UserRole.MANAGER.value:
+    elif current_user.role in [UserRole.COMPANION.value, UserRole.MANAGER.value]:
         query = query.where(Reservation.manager_id == current_user.id)
     # 관리자는 모든 예약 조회 가능
 
@@ -131,7 +131,7 @@ async def get_reservation(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="접근 권한이 없습니다.",
             )
-    elif current_user.role == UserRole.MANAGER.value:
+    elif current_user.role in [UserRole.COMPANION.value, UserRole.MANAGER.value]:
         if reservation.manager_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -247,8 +247,8 @@ async def update_reservation_status(
             detail="예약을 찾을 수 없습니다.",
         )
 
-    # 매니저인 경우 담당 예약만
-    if current_user.role == UserRole.MANAGER.value:
+    # 매니저/동행인인 경우 담당 예약만
+    if current_user.role in [UserRole.COMPANION.value, UserRole.MANAGER.value]:
         if reservation.manager_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -310,8 +310,8 @@ async def assign_manager(
             detail="대기 상태의 예약만 배정할 수 있습니다.",
         )
 
-    # 매니저인 경우 본인만 배정 가능
-    if current_user.role == UserRole.MANAGER.value:
+    # 매니저/동행인인 경우 본인만 배정 가능
+    if current_user.role in [UserRole.COMPANION.value, UserRole.MANAGER.value]:
         if manager_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

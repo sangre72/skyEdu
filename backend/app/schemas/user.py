@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
+
+from app.schemas.user_group import UserGroupResponse
 
 
 class UserBase(BaseModel):
@@ -29,6 +31,12 @@ class UserUpdate(BaseModel):
     emergency_contact: Optional[str] = Field(None, pattern=r"^01[0-9]{8,9}$")
 
 
+class UserGroupAssign(BaseModel):
+    """사용자 그룹 할당 스키마."""
+
+    group_id: Optional[UUID] = None
+
+
 class UserResponse(BaseModel):
     """사용자 응답 스키마."""
 
@@ -37,13 +45,15 @@ class UserResponse(BaseModel):
     phone: str
     email: Optional[str] = None
     role: str
+    group_id: Optional[UUID] = None
+    group: Optional["UserGroupResponse"] = None
     is_verified: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True}
 
 
 class UserProfileResponse(BaseModel):
@@ -56,11 +66,15 @@ class UserProfileResponse(BaseModel):
     emergency_contact: Optional[str] = None
     medical_notes: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True}
 
 
 class UserWithProfileResponse(UserResponse):
     """프로필 포함 사용자 응답 스키마."""
 
     profile: Optional[UserProfileResponse] = None
+
+
+UserResponse.model_rebuild()
+UserWithProfileResponse.model_rebuild()

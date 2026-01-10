@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import ThemeRegistry from '@/theme/ThemeRegistry';
+import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
 
 import './globals.css';
 
@@ -24,7 +25,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <ThemeRegistry>{children}</ThemeRegistry>
+        <ThemeRegistry>
+          <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+        </ThemeRegistry>
       </body>
     </html>
   );

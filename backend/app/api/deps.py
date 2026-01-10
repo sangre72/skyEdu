@@ -20,6 +20,16 @@ async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     """현재 인증된 사용자를 반환."""
+    # 개발 모드(기본 시크릿 키 사용)이고 인증 정보가 없는 경우
+    from app.core.config import settings
+    
+    if not credentials and settings.SECRET_KEY == "your-secret-key-change-in-production":
+        # 관리자 계정 조회
+        result = await db.execute(select(User).where(User.role == UserRole.ADMIN.value).limit(1))
+        admin_user = result.scalar_one_or_none()
+        if admin_user:
+            return admin_user
+
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -89,11 +99,11 @@ async def get_current_user_optional(
 async def get_current_active_manager(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
-    """현재 매니저 권한을 가진 사용자 반환."""
-    if current_user.role not in [UserRole.MANAGER.value, UserRole.ADMIN.value]:
+    """현재 매니저/동행인 권한을 가진 사용자 반환."""
+    if current_user.role not in [UserRole.COMPANION.value, UserRole.MANAGER.value, UserRole.ADMIN.value]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="매니저 권한이 필요합니다.",
+            detail="동행인 권한이 필요합니다.",
         )
     return current_user
 
@@ -110,9 +120,43 @@ async def get_current_admin(
     return current_user
 
 
+async def get_current_admin_optional(
+    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(security)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Optional[User]:
+    """현재 관리자 권한을 가진 사용자 반환 (개발 모드에서는 선택적)."""
+    from app.core.config import settings
+
+    # 개발 모드에서는 인증 없이도 접근 가능
+    if settings.SECRET_KEY == "your-secret-key-change-in-production":
+        # 개발 모드: 인증 정보가 없으면 None 반환
+        if not credentials:
+            return None
+
+    # 프로덕션 모드이거나 인증 정보가 있으면 정상적으로 검증
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="인증 정보가 없습니다.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user = await get_current_user(credentials, db)
+        if user.role != UserRole.ADMIN.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="관리자 권한이 필요합니다.",
+            )
+        return user
+    except HTTPException:
+        raise
+
+
 # Type aliases for dependency injection
 CurrentUser = Annotated[User, Depends(get_current_user)]
 CurrentUserOptional = Annotated[Optional[User], Depends(get_current_user_optional)]
 CurrentManager = Annotated[User, Depends(get_current_active_manager)]
 CurrentAdmin = Annotated[User, Depends(get_current_admin)]
+CurrentAdminOptional = Annotated[Optional[User], Depends(get_current_admin_optional)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]

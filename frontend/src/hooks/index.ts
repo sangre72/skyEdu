@@ -38,3 +38,29 @@ export {
   useComments,
   useCreateComment,
 } from './useBoard';
+
+// 기능 플래그
+export {
+  useFeature,
+  useFeatures,
+  useMaintenanceMode,
+  useRegistrationEnabled,
+  useKakaoLoginEnabled,
+  useReservationCreateEnabled,
+  useReservationCancelEnabled,
+  useUrgentReservationEnabled,
+  usePaymentEnabled,
+  useRefundEnabled,
+  useManagerRegistrationEnabled,
+  usePromotionEnabled,
+  useReviewWriteEnabled,
+  useBoardEnabled,
+} from './useFeature';
+
+// 메뉴
+export {
+  useMenus,
+  useMainMenus,
+  useHeaderUtilityMenus,
+  useFooterUtilityMenus,
+} from './useMenus';

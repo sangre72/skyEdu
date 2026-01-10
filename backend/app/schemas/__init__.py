@@ -55,6 +55,22 @@ from app.schemas.board import (
     PaginatedResponse,
     ErrorResponse,
 )
+from app.schemas.system_settings import (
+    SystemSettingCreate,
+    SystemSettingUpdate,
+    SystemSettingResponse,
+    FeatureFlagUpdate,
+    SystemSettingsBulkUpdate,
+)
+from app.schemas.menu import (
+    MenuCreate,
+    MenuUpdate,
+    MenuResponse,
+    MenuMove,
+    MenuReorder,
+    MenuTreeNode,
+    MenuListResponse,
+)
 
 __all__ = [
     # Auth
@@ -113,4 +129,18 @@ __all__ = [
     "AttachmentResponse",
     "PaginatedResponse",
     "ErrorResponse",
+    # SystemSettings
+    "SystemSettingCreate",
+    "SystemSettingUpdate",
+    "SystemSettingResponse",
+    "FeatureFlagUpdate",
+    "SystemSettingsBulkUpdate",
+    # Menu
+    "MenuCreate",
+    "MenuUpdate",
+    "MenuResponse",
+    "MenuMove",
+    "MenuReorder",
+    "MenuTreeNode",
+    "MenuListResponse",
 ]

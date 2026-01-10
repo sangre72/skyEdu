@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 
 import { useAuthStore } from '@/stores/authStore';
-import { findUserByPhone } from '@/lib/mockData';
+import { api } from '@/lib/api';
 
 interface LoginModalProps {
   open: boolean;
@@ -66,20 +66,14 @@ export default function LoginModal({ open, onClose, onSwitchToRegister }: LoginM
       return;
     }
 
-    const user = findUserByPhone(phoneNumbers);
-    if (!user) {
-      setError('등록되지 않은 번호입니다. 회원가입을 먼저 해주세요.');
-      return;
-    }
-
     setIsLoading(true);
     setError('');
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await api.sendVerificationCode({ phone: phoneNumbers });
       setStep('verify');
-    } catch {
-      setError('인증번호 발송에 실패했습니다.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '인증번호 발송에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -95,29 +89,22 @@ export default function LoginModal({ open, onClose, onSwitchToRegister }: LoginM
     setError('');
 
     try {
-      if (code !== '000000') {
-        setError('인증번호가 일치하지 않습니다. (테스트: 000000)');
-        setIsLoading(false);
-        return;
-      }
-
       const phoneNumbers = phone.replace(/-/g, '');
-      const user = findUserByPhone(phoneNumbers);
 
-      if (!user) {
-        setError('사용자를 찾을 수 없습니다.');
-        setIsLoading(false);
-        return;
-      }
+      // 1. 인증번호 확인
+      await api.verifyCode({ phone: phoneNumbers, code });
 
-      login(user, 'mock-access-token', 'mock-refresh-token');
+      // 2. 로그인
+      const response = await api.login({ phone: phoneNumbers, code });
+
+      login(response.user, response.access_token, response.refresh_token);
       handleClose();
 
-      if (user.role === 'companion') {
+      if (response.user.role === 'companion') {
         router.push('/companion/dashboard');
       }
-    } catch {
-      setError('로그인에 실패했습니다.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }

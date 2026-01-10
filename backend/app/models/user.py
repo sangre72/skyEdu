@@ -11,11 +11,13 @@ from app.db.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.models.manager import Manager
     from app.models.reservation import Reservation
+    from app.models.user_group import UserGroup
 
 
 class UserRole(str, Enum):
     CUSTOMER = "customer"
-    MANAGER = "manager"
+    COMPANION = "companion"  # 동행인 (매니저)
+    MANAGER = "manager"  # Legacy: 하위 호환성을 위해 유지
     ADMIN = "admin"
 
 
@@ -45,9 +47,18 @@ class User(Base, TimestampMixin):
     )
     kakao_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    group_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_groups.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     # is_active, is_deleted는 TimestampMixin에서 제공
 
     # Relationships
+    group: Mapped[Optional["UserGroup"]] = relationship(
+        "UserGroup",
+        back_populates="users",
+    )
     profile: Mapped[Optional["UserProfile"]] = relationship(
         "UserProfile",
         back_populates="user",
